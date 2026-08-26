@@ -138,22 +138,25 @@ class _SplashScreenState extends State<SplashScreen>
                           ),
                         ],
                       ),
-                      padding: const EdgeInsets.all(16),
-                      child: Image.asset(
-                        'assets/icons/KlickIcon.jpg',
-                        fit: BoxFit.contain,
-                        errorBuilder: (context, error, stackTrace) => Image.asset(
-                          'lib/assets/icons/KlickIcon.jpg',
-                          fit: BoxFit.contain,
-                          errorBuilder: (context, error, stackTrace) => Container(
-                            color: BitMechanicalTheme.primaryAmber,
-                            child: Center(
-                              child: Text(
-                                'KLIK',
-                                style: BitMechanicalTheme.headlineMono(
-                                  color: const Color(0xFF111111),
-                                  fontSize: 24,
-                                  fontWeight: FontWeight.w900,
+                      clipBehavior: Clip.antiAlias,
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(24),
+                        child: Image.asset(
+                          'assets/icons/KlickIcon.jpg',
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) => Image.asset(
+                            'lib/assets/icons/KlickIcon.jpg',
+                            fit: BoxFit.cover,
+                            errorBuilder: (context, error, stackTrace) => Container(
+                              color: BitMechanicalTheme.primaryAmber,
+                              child: Center(
+                                child: Text(
+                                  'KLIK',
+                                  style: BitMechanicalTheme.headlineMono(
+                                    color: const Color(0xFF111111),
+                                    fontSize: 24,
+                                    fontWeight: FontWeight.w900,
+                                  ),
                                 ),
                               ),
                             ),

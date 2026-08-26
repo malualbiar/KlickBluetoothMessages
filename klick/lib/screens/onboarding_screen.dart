@@ -297,7 +297,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     width: 100,
                     height: 100,
                     decoration: BoxDecoration(
-                      color: const Color(0xFF181818),
+                      color: BitMechanicalTheme.hardwareBody,
                       borderRadius: BorderRadius.circular(20),
                       border: Border.all(
                         color: BitMechanicalTheme.primaryAmber,
@@ -305,20 +305,23 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                       ),
                       boxShadow: [
                         BoxShadow(
-                          color: BitMechanicalTheme.primaryAmber.withValues(alpha: 0.25),
+                          color: BitMechanicalTheme.primaryAmber.withValues(alpha: 0.3),
                           blurRadius: 18,
                           spreadRadius: 1,
                         ),
                       ],
                     ),
-                    padding: const EdgeInsets.all(12),
-                    child: Image.asset(
-                      'assets/icons/KlickIcon.jpg',
-                      fit: BoxFit.contain,
-                      errorBuilder: (context, error, stackTrace) => const Icon(
-                        Icons.person_pin,
-                        color: BitMechanicalTheme.primaryAmber,
-                        size: 40,
+                    clipBehavior: Clip.antiAlias,
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(18),
+                      child: Image.asset(
+                        'assets/icons/KlickIcon.jpg',
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) => const Icon(
+                          Icons.person_pin,
+                          color: BitMechanicalTheme.primaryAmber,
+                          size: 40,
+                        ),
                       ),
                     ),
                   ),
