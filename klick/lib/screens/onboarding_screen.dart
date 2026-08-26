@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+
 import '../controllers/klick_controller.dart';
 import '../theme/bit_mechanical_theme.dart';
 
@@ -18,24 +19,21 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
   final List<_OnboardingItem> _pages = const [
     _OnboardingItem(
-      badge: '// 01 // OFFLINE P2P',
+      badge: 'OFFLINE P2P',
       title: 'OFFLINE MESSAGING',
-      description:
-          'Send messages to nearby devices without cellular data, internet access, or Wi-Fi routers. Direct radio connection.',
+      description: 'Send messages to nearby devices without cellular data, internet access, or Wi-Fi routers. Direct radio connection.',
       svgAsset: 'lib/assets/svgIllustrations/undraw_messaging-app_wfqi.svg',
     ),
     _OnboardingItem(
-      badge: '// 02 // DISCOVERY',
+      badge: 'DISCOVERY',
       title: 'FAST ZERO-CONFIG PAIRING',
-      description:
-          'Scan nearby Bluetooth radios in seconds. Pair with one tap and start real-time two-way chat immediately.',
+      description: 'Scan nearby Bluetooth radios in seconds. Pair with one tap and start real-time two-way chat immediately.',
       svgAsset: 'lib/assets/svgIllustrations/undraw_chatting_5u5z.svg',
     ),
     _OnboardingItem(
-      badge: '// 03 // PRIVACY',
+      badge: 'PRIVACY',
       title: 'DIRECT & DECENTRALIZED',
-      description:
-          'Zero cloud servers, zero tracking. Your conversations stay strictly between your hardware and your peer.',
+      description: 'Zero cloud servers, zero tracking. Your conversations stay strictly between your hardware and your peer.',
       svgAsset: 'lib/assets/svgIllustrations/undraw_work-chat_kw8x.svg',
     ),
   ];
@@ -111,7 +109,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 height: 22,
                 fit: BoxFit.cover,
                 errorBuilder: (context, error, stackTrace) => Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 2,
+                  ),
                   decoration: BoxDecoration(
                     color: BitMechanicalTheme.primaryAmber,
                     borderRadius: BorderRadius.circular(3),
@@ -199,22 +200,24 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                         ),
                       ],
                     ),
-                    child: SvgPicture.asset(
-                      item.svgAsset,
-                      fit: BoxFit.contain,
-                    ),
+                    child: SvgPicture.asset(item.svgAsset, fit: BoxFit.contain),
                   ),
 
                   const SizedBox(height: 24),
 
                   // Step Badge
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 3,
+                    ),
                     decoration: BoxDecoration(
                       color: BitMechanicalTheme.surfaceContainerHigh,
                       borderRadius: BorderRadius.circular(4),
                       border: Border.all(
-                        color: BitMechanicalTheme.primaryAmber.withValues(alpha: 0.4),
+                        color: BitMechanicalTheme.primaryAmber.withValues(
+                          alpha: 0.4,
+                        ),
                         width: 1,
                       ),
                     ),
@@ -337,7 +340,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                   ),
                   const SizedBox(width: 8),
                   Icon(
-                    isLastPage ? Icons.bolt : Icons.arrow_forward,
+                    isLastPage
+                        ? Icons.check_circle_outline
+                        : Icons.arrow_forward,
                     color: const Color(0xFF111111),
                     size: 16,
                   ),

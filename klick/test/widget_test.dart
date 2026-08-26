@@ -67,13 +67,38 @@ class TestBluetoothService implements BluetoothService {
 }
 
 void main() {
+  testWidgets('Klick Loading Splash Screen boot test', (WidgetTester tester) async {
+    final mockService = TestBluetoothService();
+    final controller = KlickController(bluetoothService: mockService);
+
+    // 1. Launch App with Splash enabled
+    await tester.pumpWidget(
+      KlickApp(controller: controller, showSplash: true),
+    );
+    await tester.pump();
+
+    // Verify Splash Screen UI elements
+    expect(find.text('KLICK'), findsOneWidget);
+    expect(find.text('OFFLINE BLUETOOTH COMMUNICATOR'), findsOneWidget);
+    expect(find.text('// KLICK OS'), findsOneWidget);
+
+    // Advance boot sequence
+    await tester.pump(const Duration(milliseconds: 2500));
+    await tester.pumpAndSettle();
+
+    // Verify transition to Onboarding
+    expect(find.text('OFFLINE MESSAGING'), findsOneWidget);
+
+    controller.dispose();
+  });
+
   testWidgets('Real Bluetooth device search and messaging flow test', (WidgetTester tester) async {
     final mockService = TestBluetoothService();
     final controller = KlickController(bluetoothService: mockService);
 
-    // 1. Launch App with controller
+    // 1. Launch App with controller (skip splash)
     await tester.pumpWidget(
-      KlickApp(controller: controller),
+      KlickApp(controller: controller, showSplash: false),
     );
     await tester.pumpAndSettle();
 

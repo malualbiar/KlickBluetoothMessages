@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'controllers/klick_controller.dart';
 import 'screens/onboarding_screen.dart';
+import 'screens/splash_screen.dart';
 import 'theme/bit_mechanical_theme.dart';
 import 'widgets/hardware_shell.dart';
 
@@ -12,8 +13,9 @@ void main() {
 
 class KlickApp extends StatelessWidget {
   final KlickController? controller;
+  final bool showSplash;
 
-  const KlickApp({super.key, this.controller});
+  const KlickApp({super.key, this.controller, this.showSplash = true});
 
   @override
   Widget build(BuildContext context) {
@@ -28,15 +30,16 @@ class KlickApp extends StatelessWidget {
           surface: BitMechanicalTheme.hardwareBody,
         ),
       ),
-      home: KlickMainScreen(controller: controller),
+      home: KlickMainScreen(controller: controller, showSplash: showSplash),
     );
   }
 }
 
 class KlickMainScreen extends StatefulWidget {
   final KlickController? controller;
+  final bool showSplash;
 
-  const KlickMainScreen({super.key, this.controller});
+  const KlickMainScreen({super.key, this.controller, this.showSplash = true});
 
   @override
   State<KlickMainScreen> createState() => _KlickMainScreenState();
@@ -45,11 +48,13 @@ class KlickMainScreen extends StatefulWidget {
 class _KlickMainScreenState extends State<KlickMainScreen> {
   late final KlickController _controller;
   bool _isExternalController = false;
+  late bool _isSplashLoaded;
   final FocusNode _keyboardFocusNode = FocusNode();
 
   @override
   void initState() {
     super.initState();
+    _isSplashLoaded = !widget.showSplash;
     _isExternalController = widget.controller != null;
     _controller = widget.controller ?? KlickController();
     _controller.addListener(_onControllerUpdate);
@@ -116,6 +121,17 @@ class _KlickMainScreenState extends State<KlickMainScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (!_isSplashLoaded) {
+      return SplashScreen(
+        controller: _controller,
+        onLoaded: () {
+          if (mounted) {
+            setState(() => _isSplashLoaded = true);
+          }
+        },
+      );
+    }
+
     if (!_controller.isOnboardingComplete) {
       return OnboardingScreen(controller: _controller);
     }
