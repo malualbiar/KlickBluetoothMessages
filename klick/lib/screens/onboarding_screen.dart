@@ -17,6 +17,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   final PageController _pageController = PageController();
   final TextEditingController _nameController = TextEditingController();
   int _currentPage = 0;
+  String? _nameError;
 
   final List<_OnboardingItem> _pages = const [
     _OnboardingItem(
@@ -59,7 +60,23 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
   void _finishOnboarding() {
     final name = _nameController.text.trim();
-    widget.controller.completeOnboarding(userName: name.isNotEmpty ? name : null);
+
+    // Name is mandatory — cannot skip or proceed without it
+    if (name.isEmpty) {
+      setState(() => _nameError = 'YOU MUST ENTER A CALLSIGN TO CONTINUE');
+      // Jump to the callsign form page if not already there
+      if (_currentPage < _pages.length) {
+        _pageController.animateToPage(
+          _pages.length,
+          duration: const Duration(milliseconds: 400),
+          curve: Curves.easeInOut,
+        );
+      }
+      return;
+    }
+
+    setState(() => _nameError = null);
+    widget.controller.completeOnboarding(userName: name);
   }
 
   @override
@@ -153,32 +170,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           ],
         ),
 
-        // Skip Button
-        if (_currentPage < totalPages - 1)
-          GestureDetector(
-            onTap: _finishOnboarding,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-              decoration: BoxDecoration(
-                color: BitMechanicalTheme.surfaceContainerHigh,
-                borderRadius: BorderRadius.circular(4),
-                border: Border.all(
-                  color: BitMechanicalTheme.outlineVariant,
-                  width: 1,
-                ),
-              ),
-              child: Text(
-                'SKIP',
-                style: BitMechanicalTheme.statusPixel(
-                  color: BitMechanicalTheme.outline,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: 0.5,
-                ),
-              ),
-            ),
-          )
-        else
-          const SizedBox(width: 48),
+        // No skip — name is required
+        const SizedBox(width: 48),
       ],
     );
   }
@@ -386,57 +379,94 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                   // Callsign input field
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF161616),
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(
-                          color: BitMechanicalTheme.primaryAmber,
-                          width: 1.5,
-                        ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: BitMechanicalTheme.primaryAmber.withValues(alpha: 0.15),
-                            blurRadius: 10,
-                          ),
-                        ],
-                      ),
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
-                      child: Row(
-                        children: [
-                          Text(
-                            '> ',
-                            style: BitMechanicalTheme.headlineMono(
-                              color: BitMechanicalTheme.primaryAmber,
-                              fontSize: 16,
-                              fontWeight: FontWeight.w900,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Container(
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF161616),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color: _nameError != null
+                                  ? const Color(0xFFFF4444)
+                                  : BitMechanicalTheme.primaryAmber,
+                              width: 1.5,
                             ),
-                          ),
-                          Expanded(
-                            child: TextField(
-                              controller: _nameController,
-                              style: BitMechanicalTheme.headlineMono(
-                                color: const Color(0xFFF5F5F5),
-                                fontSize: 15,
-                                fontWeight: FontWeight.w700,
-                                letterSpacing: 1.0,
+                            boxShadow: [
+                              BoxShadow(
+                                color: (_nameError != null
+                                        ? const Color(0xFFFF4444)
+                                        : BitMechanicalTheme.primaryAmber)
+                                    .withValues(alpha: 0.18),
+                                blurRadius: 10,
                               ),
-                              textCapitalization: TextCapitalization.characters,
-                              decoration: InputDecoration(
-                                hintText: 'E.G. MAVERICK, NOVA',
-                                hintStyle: BitMechanicalTheme.headlineMono(
-                                  color: BitMechanicalTheme.outlineVariant,
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w500,
+                            ],
+                          ),
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+                          child: Row(
+                            children: [
+                              Text(
+                                '> ',
+                                style: BitMechanicalTheme.headlineMono(
+                                  color: _nameError != null
+                                      ? const Color(0xFFFF4444)
+                                      : BitMechanicalTheme.primaryAmber,
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w900,
                                 ),
-                                border: InputBorder.none,
-                                isDense: true,
                               ),
-                              onSubmitted: (_) => _finishOnboarding(),
-                            ),
+                              Expanded(
+                                child: TextField(
+                                  controller: _nameController,
+                                  style: BitMechanicalTheme.headlineMono(
+                                    color: const Color(0xFFF5F5F5),
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w700,
+                                    letterSpacing: 1.0,
+                                  ),
+                                  textCapitalization: TextCapitalization.characters,
+                                  decoration: InputDecoration(
+                                    hintText: 'E.G. MAVERICK, NOVA',
+                                    hintStyle: BitMechanicalTheme.headlineMono(
+                                      color: BitMechanicalTheme.outlineVariant,
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                    border: InputBorder.none,
+                                    isDense: true,
+                                  ),
+                                  onChanged: (_) {
+                                    if (_nameError != null) {
+                                      setState(() => _nameError = null);
+                                    }
+                                  },
+                                  onSubmitted: (_) => _finishOnboarding(),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+
+                        // Error message shown when name is empty on submit
+                        if (_nameError != null) ...[
+                          const SizedBox(height: 6),
+                          Row(
+                            children: [
+                              const Icon(Icons.error_outline, size: 12, color: Color(0xFFFF4444)),
+                              const SizedBox(width: 4),
+                              Expanded(
+                                child: Text(
+                                  _nameError!,
+                                  style: BitMechanicalTheme.statusPixel(
+                                    color: const Color(0xFFFF4444),
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
                         ],
-                      ),
+                      ],
                     ),
                   ),
                 ],
@@ -483,50 +513,72 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         const SizedBox(height: 18),
 
         // Action Button (Next / Launch Klick)
-        GestureDetector(
-          onTap: isLastPage ? _finishOnboarding : _onNext,
-          child: Container(
-            width: double.infinity,
-            height: 48,
-            decoration: BoxDecoration(
-              color: BitMechanicalTheme.primaryAmber,
-              borderRadius: BorderRadius.circular(8),
-              boxShadow: const [
-                BoxShadow(
-                  color: Color(0x99000000),
-                  offset: Offset(0, 3),
-                  blurRadius: 4,
+        ValueListenableBuilder<TextEditingValue>(
+          valueListenable: _nameController,
+          builder: (context, value, _) {
+            final nameEntered = value.text.trim().isNotEmpty;
+            final isEnabled = !isLastPage || nameEntered;
+            return GestureDetector(
+              onTap: isLastPage ? _finishOnboarding : _onNext,
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                width: double.infinity,
+                height: 48,
+                decoration: BoxDecoration(
+                  color: isEnabled
+                      ? BitMechanicalTheme.primaryAmber
+                      : BitMechanicalTheme.surfaceContainerHigh,
+                  borderRadius: BorderRadius.circular(8),
+                  border: isEnabled
+                      ? null
+                      : Border.all(
+                          color: BitMechanicalTheme.outlineVariant,
+                          width: 1,
+                        ),
+                  boxShadow: isEnabled
+                      ? const [
+                          BoxShadow(
+                            color: Color(0x99000000),
+                            offset: Offset(0, 3),
+                            blurRadius: 4,
+                          ),
+                          BoxShadow(
+                            color: Color(0x40FFFFFF),
+                            offset: Offset(0, -1),
+                            blurRadius: 1,
+                          ),
+                        ]
+                      : null,
                 ),
-                BoxShadow(
-                  color: Color(0x40FFFFFF),
-                  offset: Offset(0, -1),
-                  blurRadius: 1,
+                child: Center(
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        isLastPage ? 'LAUNCH KLICK' : 'CONTINUE',
+                        style: BitMechanicalTheme.headlineMono(
+                          color: isEnabled
+                              ? const Color(0xFF111111)
+                              : BitMechanicalTheme.outlineVariant,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Icon(
+                        isLastPage ? Icons.power_settings_new : Icons.arrow_forward,
+                        color: isEnabled
+                            ? const Color(0xFF111111)
+                            : BitMechanicalTheme.outlineVariant,
+                        size: 16,
+                      ),
+                    ],
+                  ),
                 ),
-              ],
-            ),
-            child: Center(
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    isLastPage ? 'LAUNCH KLICK' : 'CONTINUE',
-                    style: BitMechanicalTheme.headlineMono(
-                      color: const Color(0xFF111111),
-                      fontSize: 14,
-                      fontWeight: FontWeight.w900,
-                      letterSpacing: 0.5,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Icon(
-                    isLastPage ? Icons.power_settings_new : Icons.arrow_forward,
-                    color: const Color(0xFF111111),
-                    size: 16,
-                  ),
-                ],
               ),
-            ),
-          ),
+            );
+          },
         ),
       ],
     );

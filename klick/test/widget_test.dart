@@ -71,6 +71,19 @@ class TestBluetoothService implements BluetoothService {
   void dispose() {}
 }
 
+/// Helper: complete onboarding by entering a callsign (SKIP was removed).
+Future<void> completeOnboarding(WidgetTester tester) async {
+  // Tap CONTINUE 3 times to reach the callsign form (page index 3)
+  for (int i = 0; i < 3; i++) {
+    await tester.tap(find.text('CONTINUE'));
+    await tester.pumpAndSettle();
+  }
+  // Enter callsign and launch
+  await tester.enterText(find.byType(TextField), 'TESTER');
+  await tester.tap(find.text('LAUNCH KLICK'));
+  await tester.pumpAndSettle();
+}
+
 void main() {
   setUp(() {
     SharedPreferences.setMockInitialValues({});
@@ -111,9 +124,8 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    // Skip onboarding
-    await tester.tap(find.text('SKIP'));
-    await tester.pumpAndSettle();
+    // Complete onboarding with a callsign (SKIP removed — name required)
+    await completeOnboarding(tester);
 
     // Verify Clean Empty Messages state
     expect(find.text('MESSAGES'), findsOneWidget);
@@ -165,8 +177,7 @@ void main() {
       KlickApp(controller: controller, showSplash: false),
     );
     await tester.pumpAndSettle();
-    await tester.tap(find.text('SKIP'));
-    await tester.pumpAndSettle();
+    await completeOnboarding(tester);
 
     // Trigger incoming connection request
     bool accepted = false;
@@ -212,8 +223,7 @@ void main() {
       KlickApp(controller: controller, showSplash: false),
     );
     await tester.pumpAndSettle();
-    await tester.tap(find.text('SKIP'));
-    await tester.pumpAndSettle();
+    await completeOnboarding(tester);
 
     // Open chat with unaccepted peer
     controller.openChat(unacceptedPeer);
@@ -224,6 +234,33 @@ void main() {
 
     // Verify input box is not available
     expect(find.byType(TextField), findsNothing);
+
+    controller.dispose();
+  });
+
+  testWidgets('Name required: LAUNCH KLICK blocked when callsign is empty', (WidgetTester tester) async {
+    final mockService = TestBluetoothService();
+    final controller = KlickController(bluetoothService: mockService);
+
+    await tester.pumpWidget(
+      KlickApp(controller: controller, showSplash: false),
+    );
+    await tester.pumpAndSettle();
+
+    // Navigate to the callsign form page (3 CONTINUE taps)
+    for (int i = 0; i < 3; i++) {
+      await tester.tap(find.text('CONTINUE'));
+      await tester.pumpAndSettle();
+    }
+
+    // Tap LAUNCH KLICK with empty name
+    await tester.tap(find.text('LAUNCH KLICK'));
+    await tester.pumpAndSettle();
+
+    // Verify error message is shown and app did NOT navigate away
+    expect(find.text('YOU MUST ENTER A CALLSIGN TO CONTINUE'), findsOneWidget);
+    expect(find.text('OFFLINE MESSAGING'), findsNothing); // still on onboarding form
+    expect(find.text('MESSAGES'), findsNothing); // didn't reach home
 
     controller.dispose();
   });
