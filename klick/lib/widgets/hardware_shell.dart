@@ -143,7 +143,7 @@ class HardwareShell extends StatelessWidget {
         currentBody = DiscoveryScreen(controller: controller);
         leftSoftKey = 'Back';
         centerTitle = 'SCAN';
-        rightSoftKey = 'Connect';
+        rightSoftKey = 'Klick';
         onLeftSoftKey = controller.goBack;
         onRightSoftKey = () {
           if (controller.discoveredDevices.isNotEmpty &&

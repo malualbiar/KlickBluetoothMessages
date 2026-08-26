@@ -167,64 +167,96 @@ class _ConversationScreenState extends State<ConversationScreen> {
                 ),
         ),
 
-        // Message Input Box
-        Container(
-          decoration: BoxDecoration(
-            color: inkColor.withValues(alpha: 0.08),
-            border: Border.all(color: inkColor, width: 1.5),
-          ),
-          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-          child: Row(
-            children: [
-              Expanded(
-                child: TextField(
-                  controller: widget.controller.textInputController,
-                  style: BitMechanicalTheme.bodyMd(
-                    color: inkColor,
-                    fontWeight: FontWeight.w700,
-                  ),
-                  decoration: InputDecoration(
-                    isDense: true,
-                    contentPadding: EdgeInsets.zero,
-                    border: InputBorder.none,
-                    hintText: 'Type message...',
-                    hintStyle: BitMechanicalTheme.bodyMd(
-                      color: inkColor.withValues(alpha: 0.4),
-                    ),
-                  ),
-                  onSubmitted: (_) {
-                    widget.controller.sendMessageFromInput();
-                  },
+        // Message Input Box or Locked Notice
+        if (!widget.device.isConnected)
+          Container(
+            decoration: BoxDecoration(
+              color: inkColor.withValues(alpha: 0.08),
+              border: Border.all(
+                  color: inkColor.withValues(alpha: 0.4), width: 1.5),
+            ),
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.lock_outline,
+                  size: 13,
+                  color: inkColor.withValues(alpha: 0.8),
                 ),
-              ),
-              if (_cursorVisible)
-                Text(
-                  '█',
-                  style: TextStyle(
-                    color: inkColor,
-                    fontSize: 11,
-                  ),
-                ),
-              const SizedBox(width: 5),
-              GestureDetector(
-                onTap: () {
-                  widget.controller.sendMessageFromInput();
-                },
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-                  color: inkColor,
+                const SizedBox(width: 6),
+                Flexible(
                   child: Text(
-                    'SEND',
+                    'WAITING FOR ${widget.device.name.toUpperCase()} TO ACCEPT KLICK',
+                    overflow: TextOverflow.ellipsis,
                     style: BitMechanicalTheme.statusPixel(
-                      color: bgColor,
+                      color: inkColor.withValues(alpha: 0.85),
                       fontWeight: FontWeight.w900,
                     ),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
+          )
+        else
+          Container(
+            decoration: BoxDecoration(
+              color: inkColor.withValues(alpha: 0.08),
+              border: Border.all(color: inkColor, width: 1.5),
+            ),
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+            child: Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: widget.controller.textInputController,
+                    style: BitMechanicalTheme.bodyMd(
+                      color: inkColor,
+                      fontWeight: FontWeight.w700,
+                    ),
+                    decoration: InputDecoration(
+                      isDense: true,
+                      contentPadding: EdgeInsets.zero,
+                      border: InputBorder.none,
+                      hintText: 'Type message...',
+                      hintStyle: BitMechanicalTheme.bodyMd(
+                        color: inkColor.withValues(alpha: 0.4),
+                      ),
+                    ),
+                    onSubmitted: (_) {
+                      widget.controller.sendMessageFromInput();
+                    },
+                  ),
+                ),
+                if (_cursorVisible)
+                  Text(
+                    '█',
+                    style: TextStyle(
+                      color: inkColor,
+                      fontSize: 11,
+                    ),
+                  ),
+                const SizedBox(width: 5),
+                GestureDetector(
+                  onTap: () {
+                    widget.controller.sendMessageFromInput();
+                  },
+                  child: Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                    color: inkColor,
+                    child: Text(
+                      'SEND',
+                      style: BitMechanicalTheme.statusPixel(
+                        color: bgColor,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
-        ),
       ],
     );
   }

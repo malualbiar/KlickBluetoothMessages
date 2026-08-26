@@ -66,6 +66,7 @@ class KlickController extends ChangeNotifier {
 
   // Incoming Connection Request ("Username is trying to Klick!")
   KlickConnectionRequest? activeConnectionRequest;
+  String? pendingKlickEndpointId;
 
   // In-App Notification Toast
   String? inAppToast;
@@ -170,17 +171,22 @@ class KlickController extends ChangeNotifier {
     };
 
     _bluetoothService.onConnected = (endpointId, name) {
+      final wasPending = pendingKlickEndpointId == endpointId;
+      pendingKlickEndpointId = null;
+
       final index = devices.indexWhere((d) => d.id == endpointId || d.macAddress == endpointId);
       final devName = _getPreservedName(endpointId, name);
 
+      KlickDevice pairedDev;
       if (index != -1) {
-        devices[index] = devices[index].copyWith(
+        pairedDev = devices[index].copyWith(
           isConnected: true,
           name: devName,
           lastSeen: DateTime.now(),
         );
+        devices[index] = pairedDev;
       } else {
-        final newDev = KlickDevice(
+        pairedDev = KlickDevice(
           id: endpointId,
           name: devName,
           macAddress: endpointId,
@@ -189,18 +195,23 @@ class KlickController extends ChangeNotifier {
           deviceType: DeviceType.smartphone,
           lastSeen: DateTime.now(),
         );
-        devices.insert(0, newDev);
+        devices.insert(0, pairedDev);
         conversationMessages[endpointId] ??= [];
       }
 
       if (activeChatDevice?.id == endpointId) {
-        activeChatDevice = activeChatDevice?.copyWith(isConnected: true, lastSeen: DateTime.now());
+        activeChatDevice = pairedDev;
       }
 
       _storageService.saveContacts(devices);
 
       // Flush and deliver any queued messages for this peer!
       _flushPendingQueue(endpointId);
+
+      if (wasPending) {
+        showInAppToast('// KLICK ACCEPTED BY ${devName.toUpperCase()} //');
+        openChat(pairedDev);
+      }
 
       notifyListeners();
     };
@@ -500,8 +511,12 @@ class KlickController extends ChangeNotifier {
   }
 
   void sendDirectMessage(KlickDevice device, String text) {
+    if (!device.isConnected) {
+      showInAppToast('// CANNOT SEND: WAITING FOR ${device.name.toUpperCase()} TO ACCEPT KLICK //');
+      return;
+    }
+
     final msgId = 'msg_${DateTime.now().millisecondsSinceEpoch}';
-    final isOnline = device.isConnected;
 
     final userMsg = KlickMessage(
       id: msgId,
@@ -509,7 +524,7 @@ class KlickController extends ChangeNotifier {
       senderName: 'Me',
       text: text,
       timestamp: DateTime.now(),
-      status: isOnline ? MessageStatus.sent : MessageStatus.queued,
+      status: MessageStatus.sent,
       isMe: true,
     );
 
@@ -517,22 +532,13 @@ class KlickController extends ChangeNotifier {
     list.add(userMsg);
     conversationMessages[device.id] = list;
 
-    if (!isOnline) {
-      // Store in outgoing pending queue
-      final qList = List<KlickMessage>.from(pendingMessages[device.id] ?? []);
-      qList.add(userMsg);
-      pendingMessages[device.id] = qList;
-      _storageService.savePendingQueue(pendingMessages);
-      showInAppToast('// RADIO OFFLINE: MESSAGE QUEUED //');
-    } else {
-      // Transmit live over Bluetooth
-      _bluetoothService.sendMessage(device.id, text).then((success) {
-        if (!success) {
-          // If transmit failed, move to pending queue
-          _queueFailedMessage(device.id, userMsg);
-        }
-      });
-    }
+    // Transmit live over Bluetooth
+    _bluetoothService.sendMessage(device.id, text).then((success) {
+      if (!success) {
+        // If transmit failed, move to pending queue
+        _queueFailedMessage(device.id, userMsg);
+      }
+    });
 
     // Persist messages and contacts
     _storageService.saveMessages(conversationMessages);
@@ -626,19 +632,11 @@ class KlickController extends ChangeNotifier {
       return;
     }
 
-    await _bluetoothService.connect(device.id, localDeviceName);
+    pendingKlickEndpointId = device.id;
+    showInAppToast('// KLICK SENT: WAITING FOR ${device.name.toUpperCase()} TO ACCEPT //');
+    notifyListeners();
 
-    if (!devices.any((d) => d.id == device.id)) {
-      final paired = device.copyWith(isConnected: true, lastSeen: DateTime.now());
-      devices.insert(0, paired);
-      conversationMessages[paired.id] ??= [];
-      _storageService.saveContacts(devices);
-      _storageService.saveMessages(conversationMessages);
-      openChat(paired);
-    } else {
-      final existing = devices.firstWhere((d) => d.id == device.id);
-      openChat(existing.copyWith(isConnected: true, lastSeen: DateTime.now()));
-    }
+    await _bluetoothService.connect(device.id, localDeviceName);
   }
 
   @override

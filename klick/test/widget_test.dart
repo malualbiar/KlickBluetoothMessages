@@ -4,7 +4,6 @@ import 'package:klick/controllers/klick_controller.dart';
 import 'package:klick/main.dart';
 import 'package:klick/models/bluetooth_device.dart';
 import 'package:klick/services/bluetooth_service.dart';
-import 'package:klick/services/storage_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class TestBluetoothService implements BluetoothService {
@@ -52,6 +51,7 @@ class TestBluetoothService implements BluetoothService {
 
   @override
   Future<void> connect(String endpointId, String localName) async {
+    // Peer connects / accepts
     final name = endpointId == 'dev_peer_7' ? 'Alpha Node' : 'Pixel 9 Pro';
     onConnected?.call(endpointId, name);
   }
@@ -127,15 +127,15 @@ void main() {
     // Verify Scanner screen
     expect(find.text('NEARBY DEVICES'), findsOneWidget);
 
-    // Verify discovered real physical device
+    // Verify discovered real physical device shows KLICK button
     expect(find.text('Pixel 9 Pro'), findsOneWidget);
-    expect(find.text('CONNECT'), findsOneWidget);
+    expect(find.text('KLICK'), findsWidgets);
 
-    // 3. Tap Connect
-    await tester.tap(find.text('CONNECT'));
+    // 3. Tap KLICK (User requests connection)
+    await tester.tap(find.text('KLICK').first);
     await tester.pumpAndSettle();
 
-    // Verify Chat Screen opens and shows ONLINE presence
+    // Verify Chat Screen opens once accepted and shows ONLINE presence
     expect(find.text('Pixel 9 Pro'), findsWidgets);
     expect(find.text('ONLINE'), findsOneWidget);
     expect(find.text('Type message...'), findsOneWidget);
@@ -194,43 +194,36 @@ void main() {
     controller.dispose();
   });
 
-  test('Store-and-Forward offline queue auto-flushing unit test', () async {
-    final storage = StorageService();
+  testWidgets('Block messaging when peer has not accepted Klick', (WidgetTester tester) async {
     final mockService = TestBluetoothService();
-    final controller = KlickController(
-      bluetoothService: mockService,
-      storageService: storage,
-    );
+    final controller = KlickController(bluetoothService: mockService);
 
-    await Future.delayed(const Duration(milliseconds: 50));
-    await controller.completeOnboarding(userName: 'MAVERICK');
-
-    // Create offline peer
-    final offlinePeer = KlickDevice(
-      id: 'peer_offline_1',
-      name: 'Shadow',
+    final unacceptedPeer = KlickDevice(
+      id: 'peer_unaccepted_1',
+      name: 'Ghost',
       macAddress: '11:22:33:44:55:66',
       rssi: -60,
       isConnected: false,
       lastSeen: DateTime.now(),
     );
-    controller.devices.add(offlinePeer);
+    controller.devices.add(unacceptedPeer);
 
-    // Send message while peer is offline
-    controller.sendDirectMessage(offlinePeer, 'Hey Shadow, offline message test');
+    await tester.pumpWidget(
+      KlickApp(controller: controller, showSplash: false),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('SKIP'));
+    await tester.pumpAndSettle();
 
-    // Verify message is queued
-    expect(controller.pendingMessages['peer_offline_1']?.length, 1);
-    expect(controller.conversationMessages['peer_offline_1']?.first.status, MessageStatus.queued);
+    // Open chat with unaccepted peer
+    controller.openChat(unacceptedPeer);
+    await tester.pumpAndSettle();
 
-    // Now peer reconnects!
-    mockService.onConnected?.call('peer_offline_1', 'Shadow');
-    await Future.delayed(const Duration(milliseconds: 50));
+    // Verify locked banner is displayed
+    expect(find.text('WAITING FOR GHOST TO ACCEPT KLICK'), findsOneWidget);
 
-    // Verify queue was flushed and sent over Bluetooth
-    expect(mockService.sentMessages.contains('peer_offline_1: Hey Shadow, offline message test'), isTrue);
-    expect(controller.pendingMessages['peer_offline_1']?.isEmpty ?? true, isTrue);
-    expect(controller.conversationMessages['peer_offline_1']?.first.status, MessageStatus.sent);
+    // Verify input box is not available
+    expect(find.byType(TextField), findsNothing);
 
     controller.dispose();
   });

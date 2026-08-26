@@ -213,7 +213,11 @@ class DiscoveryScreen extends StatelessWidget {
                                     : null,
                               ),
                               child: Text(
-                                isAlreadyFriend ? 'KLICKED' : 'CONNECT',
+                                isAlreadyFriend
+                                    ? 'KLICKED'
+                                    : (controller.pendingKlickEndpointId == device.id
+                                        ? 'PENDING...'
+                                        : 'KLICK'),
                                 style: BitMechanicalTheme.statusPixel(
                                   color: isAlreadyFriend
                                       ? (isFocused ? inkColor : inkColor)
