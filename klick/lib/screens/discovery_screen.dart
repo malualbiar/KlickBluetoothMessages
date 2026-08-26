@@ -124,7 +124,7 @@ class DiscoveryScreen extends StatelessWidget {
                     final isFocused = controller.listFocusIndex == index;
 
                     final isAlreadyFriend = controller.devices.any(
-                        (d) => d.id == device.id || d.macAddress == device.id);
+                        (d) => (d.id == device.id || d.macAddress == device.id) && d.isPaired);
 
                     return GestureDetector(
                       onTap: () {

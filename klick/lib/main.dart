@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'controllers/klick_controller.dart';
 import 'screens/onboarding_screen.dart';
 import 'screens/splash_screen.dart';
+import 'services/background_service.dart';
 import 'theme/bit_mechanical_theme.dart';
 import 'widgets/hardware_shell.dart';
 
@@ -45,7 +46,8 @@ class KlickMainScreen extends StatefulWidget {
   State<KlickMainScreen> createState() => _KlickMainScreenState();
 }
 
-class _KlickMainScreenState extends State<KlickMainScreen> {
+class _KlickMainScreenState extends State<KlickMainScreen>
+    with WidgetsBindingObserver {
   late final KlickController _controller;
   bool _isExternalController = false;
   late bool _isSplashLoaded;
@@ -61,6 +63,27 @@ class _KlickMainScreenState extends State<KlickMainScreen> {
 
     // Register physical hardware keyboard listener
     HardwareKeyboard.instance.addHandler(_handlePhysicalKeyEvent);
+
+    // Register for app lifecycle events (background/foreground)
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  /// Called by Android/iOS when the app lifecycle state changes.
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    switch (state) {
+      case AppLifecycleState.paused:
+      case AppLifecycleState.hidden:
+        // App went to background — start foreground service to keep BT alive
+        BackgroundService.start();
+        break;
+      case AppLifecycleState.resumed:
+        // App back in foreground — stop the foreground service (UI is running now)
+        BackgroundService.stop();
+        break;
+      default:
+        break;
+    }
   }
 
   void _onControllerUpdate() {
@@ -110,6 +133,7 @@ class _KlickMainScreenState extends State<KlickMainScreen> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     HardwareKeyboard.instance.removeHandler(_handlePhysicalKeyEvent);
     _controller.removeListener(_onControllerUpdate);
     if (!_isExternalController) {

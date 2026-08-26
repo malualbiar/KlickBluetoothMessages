@@ -264,4 +264,84 @@ void main() {
 
     controller.dispose();
   });
+
+  testWidgets('Already-paired friend auto-accepts reconnection without modal', (WidgetTester tester) async {
+    final mockService = TestBluetoothService();
+    final controller = KlickController(bluetoothService: mockService);
+
+    final pairedFriend = KlickDevice(
+      id: 'ep_friend_1',
+      name: 'MAVERICK',
+      macAddress: 'ep_friend_1',
+      rssi: -50,
+      isConnected: false,
+      isPaired: true,
+      lastSeen: DateTime.now(),
+    );
+    controller.devices.add(pairedFriend);
+
+    await tester.pumpWidget(
+      KlickApp(controller: controller, showSplash: false),
+    );
+    await tester.pumpAndSettle();
+    await completeOnboarding(tester);
+
+    bool autoAccepted = false;
+    mockService.onConnectionRequest?.call(
+      'ep_friend_1',
+      'MAVERICK',
+      () async { autoAccepted = true; },
+      () async {},
+    );
+    await tester.pump();
+
+    // Verify NO interactive modal appeared because they are already paired friends
+    expect(find.text('// INCOMING KLICK //'), findsNothing);
+    expect(autoAccepted, isTrue);
+    expect(controller.activeConnectionRequest, isNull);
+
+    controller.dispose();
+  });
+
+  testWidgets('Paired offline contact allows typing and queues message', (WidgetTester tester) async {
+    final mockService = TestBluetoothService();
+    final controller = KlickController(bluetoothService: mockService);
+
+    final pairedOfflineContact = KlickDevice(
+      id: 'ep_friend_2',
+      name: 'NOVA',
+      macAddress: 'ep_friend_2',
+      rssi: -55,
+      isConnected: false,
+      isPaired: true,
+      lastSeen: DateTime.now(),
+    );
+    controller.devices.add(pairedOfflineContact);
+
+    await tester.pumpWidget(
+      KlickApp(controller: controller, showSplash: false),
+    );
+    await tester.pumpAndSettle();
+    await completeOnboarding(tester);
+
+    // Open chat with paired offline contact
+    controller.openChat(pairedOfflineContact);
+    await tester.pumpAndSettle();
+
+    // Verify input box IS available (not locked) with offline hint
+    expect(find.byType(TextField), findsOneWidget);
+    expect(find.text('Type message (queued offline)...'), findsOneWidget);
+
+    // Send a message while offline
+    await tester.enterText(find.byType(TextField), 'Hello offline friend');
+    await tester.tap(find.text('SEND'));
+    await tester.pump();
+
+    // Verify message is saved and queued
+    expect(controller.pendingMessages['ep_friend_2']?.length, 1);
+    expect(find.text('Hello offline friend'), findsOneWidget);
+
+    controller.dispose();
+  });
 }
+

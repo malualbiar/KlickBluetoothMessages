@@ -25,6 +25,9 @@ class KlickDevice {
   final DateTime lastSeen;
   final int unreadCount;
   final String? customStatus;
+  /// True once this contact has ever accepted a Klick connection with us.
+  /// Paired contacts skip the accept/reject modal on future encounters.
+  final bool isPaired;
 
   const KlickDevice({
     required this.id,
@@ -36,6 +39,7 @@ class KlickDevice {
     required this.lastSeen,
     this.unreadCount = 0,
     this.customStatus,
+    this.isPaired = false,
   });
 
   KlickDevice copyWith({
@@ -48,6 +52,7 @@ class KlickDevice {
     DateTime? lastSeen,
     int? unreadCount,
     String? customStatus,
+    bool? isPaired,
   }) {
     return KlickDevice(
       id: id ?? this.id,
@@ -59,6 +64,7 @@ class KlickDevice {
       lastSeen: lastSeen ?? this.lastSeen,
       unreadCount: unreadCount ?? this.unreadCount,
       customStatus: customStatus ?? this.customStatus,
+      isPaired: isPaired ?? this.isPaired,
     );
   }
 
@@ -80,6 +86,7 @@ class KlickDevice {
       'lastSeen': lastSeen.toIso8601String(),
       'unreadCount': unreadCount,
       'customStatus': customStatus,
+      'isPaired': isPaired,
     };
   }
 
@@ -96,6 +103,7 @@ class KlickDevice {
           : DateTime.now(),
       unreadCount: json['unreadCount'] as int? ?? 0,
       customStatus: json['customStatus'] as String?,
+      isPaired: json['isPaired'] as bool? ?? false,
     );
   }
 }

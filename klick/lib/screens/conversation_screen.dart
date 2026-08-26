@@ -168,7 +168,7 @@ class _ConversationScreenState extends State<ConversationScreen> {
         ),
 
         // Message Input Box or Locked Notice
-        if (!widget.device.isConnected)
+        if (!widget.device.isPaired && !widget.device.isConnected)
           Container(
             decoration: BoxDecoration(
               color: inkColor.withValues(alpha: 0.08),
@@ -218,7 +218,9 @@ class _ConversationScreenState extends State<ConversationScreen> {
                       isDense: true,
                       contentPadding: EdgeInsets.zero,
                       border: InputBorder.none,
-                      hintText: 'Type message...',
+                      hintText: widget.device.isConnected
+                          ? 'Type message...'
+                          : 'Type message (queued offline)...',
                       hintStyle: BitMechanicalTheme.bodyMd(
                         color: inkColor.withValues(alpha: 0.4),
                       ),

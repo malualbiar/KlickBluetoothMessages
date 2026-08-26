@@ -117,11 +117,35 @@ class KlickController extends ChangeNotifier {
 
     await _initRadio();
 
+    // Silent background discovery: auto-reconnect to known paired contacts
+    // This runs quietly on startup — no spinner, no UI — and auto-connects
+    // to any saved contacts that are currently in range.
+    if (devices.any((d) => d.isPaired)) {
+      _startSilentReconnectDiscovery();
+    }
+
     isInitialized = true;
     notifyListeners();
   }
 
+  /// Starts discovery silently in the background to reconnect to known paired
+  /// contacts. Stops automatically after 60 seconds or when all reconnected.
+  void _startSilentReconnectDiscovery() {
+    debugPrint('[KlickController] Starting silent reconnect discovery...');
+    _bluetoothService.startDiscovery(localDeviceName);
+
+    // Stop silent discovery after 60s to save battery
+    Timer(const Duration(seconds: 60), () {
+      if (!isScanning) {
+        // Only stop if the user isn't actively scanning
+        _bluetoothService.stopDiscovery();
+        debugPrint('[KlickController] Silent reconnect discovery timeout');
+      }
+    });
+  }
+
   void _initBluetoothListeners() {
+    // Auto-reconnect to known paired peers in background
     _bluetoothService.onDeviceFound = (device) {
       if (!discoveredDevices.any((d) => d.id == device.id)) {
         discoveredDevices.add(device);
@@ -129,9 +153,10 @@ class KlickController extends ChangeNotifier {
       }
 
       // Auto-reconnect to known paired peers in background
-      final isKnown = devices.any((d) => d.id == device.id || d.macAddress == device.macAddress);
-      if (isKnown && !device.isConnected) {
-        debugPrint('Auto-reconnecting to known peer: ${device.name} (${device.id})');
+      final isKnownPaired = devices.any((d) =>
+          (d.id == device.id || d.macAddress == device.macAddress) && d.isPaired);
+      if (isKnownPaired && !device.isConnected) {
+        debugPrint('Auto-reconnecting to known paired peer: ${device.name} (${device.id})');
         _bluetoothService.connect(device.id, localDeviceName);
       }
     };
@@ -149,8 +174,20 @@ class KlickController extends ChangeNotifier {
     };
 
     // Interactive connection authorization ("Username is trying to Klick!")
-    _bluetoothService.onConnectionRequest = (endpointId, endpointName, accept, reject) {
+    _bluetoothService.onConnectionRequest = (endpointId, endpointName, accept, reject) async {
       final displayName = _getPreservedName(endpointId, endpointName);
+      final existingIndex = devices.indexWhere((d) => d.id == endpointId || d.macAddress == endpointId);
+      final isAlreadyPaired = existingIndex != -1 && devices[existingIndex].isPaired;
+
+      if (isAlreadyPaired) {
+        // Auto-accept connection for already-paired / established friends!
+        debugPrint('Auto-accepting connection request from already-paired contact: $displayName ($endpointId)');
+        await accept();
+        showInAppToast('// RECONNECTED: ${displayName.toUpperCase()} //');
+        return;
+      }
+
+      // Otherwise, stranger / new Klick connection requires authorization
       activeConnectionRequest = KlickConnectionRequest(
         endpointId: endpointId,
         endpointName: displayName,
@@ -191,6 +228,7 @@ class KlickController extends ChangeNotifier {
       if (index != -1) {
         pairedDev = devices[index].copyWith(
           isConnected: true,
+          isPaired: true,
           name: devName,
           lastSeen: DateTime.now(),
         );
@@ -202,6 +240,7 @@ class KlickController extends ChangeNotifier {
           macAddress: endpointId,
           rssi: -50,
           isConnected: true,
+          isPaired: true,
           deviceType: DeviceType.smartphone,
           lastSeen: DateTime.now(),
         );
@@ -296,13 +335,18 @@ class KlickController extends ChangeNotifier {
         macAddress: endpointId,
         rssi: -50,
         isConnected: true,
+        isPaired: true,
         deviceType: DeviceType.smartphone,
         lastSeen: DateTime.now(),
       );
       devices.insert(0, newDev);
     } else {
       final idx = devices.indexWhere((d) => d.id == endpointId || d.macAddress == endpointId);
-      devices[idx] = devices[idx].copyWith(isConnected: true, lastSeen: DateTime.now());
+      devices[idx] = devices[idx].copyWith(
+        isConnected: true,
+        isPaired: true,
+        lastSeen: DateTime.now(),
+      );
     }
 
     final msg = KlickMessage(
@@ -521,7 +565,7 @@ class KlickController extends ChangeNotifier {
   }
 
   void sendDirectMessage(KlickDevice device, String text) {
-    if (!device.isConnected) {
+    if (!device.isPaired && !device.isConnected) {
       showInAppToast('// CANNOT SEND: WAITING FOR ${device.name.toUpperCase()} TO ACCEPT KLICK //');
       return;
     }
@@ -534,7 +578,7 @@ class KlickController extends ChangeNotifier {
       senderName: 'Me',
       text: text,
       timestamp: DateTime.now(),
-      status: MessageStatus.sent,
+      status: device.isConnected ? MessageStatus.sent : MessageStatus.queued,
       isMe: true,
     );
 
@@ -542,13 +586,19 @@ class KlickController extends ChangeNotifier {
     list.add(userMsg);
     conversationMessages[device.id] = list;
 
-    // Transmit live over Bluetooth
-    _bluetoothService.sendMessage(device.id, text).then((success) {
-      if (!success) {
-        // If transmit failed, move to pending queue
-        _queueFailedMessage(device.id, userMsg);
-      }
-    });
+    if (device.isConnected) {
+      // Transmit live over Bluetooth
+      _bluetoothService.sendMessage(device.id, text).then((success) {
+        if (!success) {
+          // If transmit failed, move to pending queue
+          _queueFailedMessage(device.id, userMsg);
+        }
+      });
+    } else {
+      // Message is queued offline until connection resumes
+      _queueFailedMessage(device.id, userMsg);
+      showInAppToast('// OFFLINE: MESSAGE QUEUED FOR ${device.name.toUpperCase()} //');
+    }
 
     // Persist messages and contacts
     _storageService.saveMessages(conversationMessages);
@@ -635,9 +685,12 @@ class KlickController extends ChangeNotifier {
   }
 
   Future<void> connectDiscoveredDevice(KlickDevice device) async {
-    // If already known and paired, open directly
+    // If already known and paired, connect if needed and open directly
     final existingIdx = devices.indexWhere((d) => d.id == device.id || d.macAddress == device.macAddress);
-    if (existingIdx != -1) {
+    if (existingIdx != -1 && devices[existingIdx].isPaired) {
+      if (!devices[existingIdx].isConnected) {
+        await _bluetoothService.connect(device.id, localDeviceName);
+      }
       openChat(devices[existingIdx]);
       return;
     }
