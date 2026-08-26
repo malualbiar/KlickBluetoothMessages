@@ -1,0 +1,391 @@
+<!DOCTYPE html><html class="dark" lang="en"><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>LINK Phone OS</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400;1,700&amp;family=JetBrains+Mono:wght@400;500;700;800&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              "colors": {
+                      "outline-variant": "#4e4634",
+                      "inverse-primary": "#775a00",
+                      "background": "#131313",
+                      "secondary-fixed-dim": "#c8c6c5",
+                      "surface-container-low": "#1c1b1b",
+                      "on-tertiary-fixed": "#001e30",
+                      "surface-container-high": "#2a2a2a",
+                      "tertiary-container": "#70c2ff",
+                      "secondary-fixed": "#e5e2e1",
+                      "on-tertiary-fixed-variant": "#004b71",
+                      "on-secondary-container": "#b7b5b4",
+                      "error": "#ffb4ab",
+                      "surface-bright": "#393939",
+                      "on-secondary": "#313030",
+                      "on-tertiary-container": "#004f76",
+                      "primary": "#ffd05e",
+                      "surface-variant": "#353534",
+                      "primary-container": "#e6b325",
+                      "inverse-on-surface": "#313030",
+                      "on-primary-container": "#5e4700",
+                      "tertiary-fixed": "#cbe6ff",
+                      "surface-container": "#201f1f",
+                      "surface": "#131313",
+                      "on-surface": "#e5e2e1",
+                      "inverse-surface": "#e5e2e1",
+                      "secondary": "#c8c6c5",
+                      "surface-dim": "#131313",
+                      "on-primary": "#3f2e00",
+                      "on-error-container": "#ffdad6",
+                      "on-secondary-fixed": "#1c1b1b",
+                      "tertiary": "#b2dbff",
+                      "error-container": "#93000a",
+                      "tertiary-fixed-dim": "#8fcdff",
+                      "surface-container-lowest": "#0e0e0e",
+                      "on-primary-fixed-variant": "#5a4300",
+                      "secondary-container": "#474746",
+                      "surface-tint": "#f3bf32",
+                      "on-error": "#690005",
+                      "on-secondary-fixed-variant": "#474746",
+                      "primary-fixed-dim": "#f3bf32",
+                      "primary-fixed": "#ffdf99",
+                      "on-primary-fixed": "#251a00",
+                      "on-tertiary": "#003450",
+                      "on-background": "#e5e2e1",
+                      "outline": "#9b8f7a",
+                      "surface-container-highest": "#353534",
+                      "on-surface-variant": "#d2c5ad"
+              },
+              "borderRadius": {
+                      "DEFAULT": "0.25rem",
+                      "lg": "0.5rem",
+                      "xl": "0.75rem",
+                      "full": "9999px"
+              },
+              "spacing": {
+                      "gutter": "16px",
+                      "key-gap": "2px",
+                      "pixel-unit": "4px",
+                      "margin-edge": "24px"
+              },
+              "fontFamily": {
+                      "headline-md": [
+                              "Space Mono"
+                      ],
+                      "label-caps": [
+                              "JetBrains Mono"
+                      ],
+                      "body-lg": [
+                              "JetBrains Mono"
+                      ],
+                      "headline-lg": [
+                              "Space Mono"
+                      ],
+                      "status-pixel": [
+                              "JetBrains Mono"
+                      ],
+                      "body-md": [
+                              "JetBrains Mono"
+                      ]
+              },
+              "fontSize": {
+                      "headline-md": [
+                              "18px",
+                              {
+                                      "lineHeight": "24px",
+                                      "letterSpacing": "0em",
+                                      "fontWeight": "700"
+                              }
+                      ],
+                      "label-caps": [
+                              "12px",
+                              {
+                                      "lineHeight": "16px",
+                                      "letterSpacing": "0.1em",
+                                      "fontWeight": "800"
+                              }
+                      ],
+                      "body-lg": [
+                              "16px",
+                              {
+                                      "lineHeight": "24px",
+                                      "letterSpacing": "-0.01em",
+                                      "fontWeight": "500"
+                              }
+                      ],
+                      "headline-lg": [
+                              "24px",
+                              {
+                                      "lineHeight": "32px",
+                                      "letterSpacing": "-0.02em",
+                                      "fontWeight": "700"
+                              }
+                      ],
+                      "status-pixel": [
+                              "10px",
+                              {
+                                      "lineHeight": "12px",
+                                      "letterSpacing": "0.05em",
+                                      "fontWeight": "700"
+                              }
+                      ],
+                      "body-md": [
+                              "14px",
+                              {
+                                      "lineHeight": "20px",
+                                      "letterSpacing": "0em",
+                                      "fontWeight": "400"
+                              }
+                      ]
+              }
+      },
+          },
+        }
+    </script>
+<style>
+        /* Custom styles for physical buttons and tactile feel */
+        .hardware-btn {
+            background-color: #1A1A1A;
+            box-shadow: inset 0 1px 0 #333333, 0 2px 4px rgba(0,0,0,0.5);
+            transition: all 0.05s ease;
+        }
+        .hardware-btn:active, .hardware-btn.active {
+            background-color: #111;
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.8);
+            transform: translateY(2px);
+        }
+        
+        .dpad-center {
+            background: linear-gradient(135deg, #2a2a2a, #111);
+            box-shadow: inset 0 1px 0 #444, 0 4px 6px rgba(0,0,0,0.8);
+        }
+        .dpad-center:active, .dpad-center.active {
+            box-shadow: inset 0 2px 8px rgba(0,0,0,0.9);
+            transform: translateY(2px);
+        }
+
+        .lcd-screen {
+            background-color: #e6b325; /* primary-container */
+            color: #131313; /* background */
+            box-shadow: inset 0 0 15px rgba(0,0,0,0.4);
+            /* Simulating pixel grid faintly */
+            background-image: 
+                linear-gradient(rgba(0,0,0,0.05) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0,0,0,0.05) 1px, transparent 1px);
+            background-size: 2px 2px;
+        }
+
+        /* CRT Bubble Effect */
+        .bubble-bezel {
+            border-radius: 18% / 12%;
+            background-color: #0e0e0e; /* surface-container-lowest */
+            box-shadow: inset 0 4px 12px rgba(0,0,0,0.8), 0 2px 4px rgba(255,255,255,0.05);
+        }
+        .bubble-screen {
+            border-radius: 15% / 10%;
+        }
+
+        /* Hide home screen initially for boot sequence */
+        #home-screen { display: none; }
+        
+        /* Focus state for LCD items */
+        .lcd-focus-item.focused {
+            background-color: #131313;
+            color: #e6b325;
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+</head>
+<body class="bg-surface-container-lowest min-h-screen flex items-center justify-center font-body-md text-on-surface p-4">
+<!-- The Phone Body -->
+<div class="relative w-[360px] h-[720px] bg-background rounded-3xl shadow-[0_20px_50px_rgba(0,0,0,0.8)] border-4 border-surface-container-high overflow-hidden flex flex-col p-4 box-border">
+<!-- Speaker Grill -->
+<div class="w-16 h-2 bg-surface-container-high mx-auto mt-2 rounded-full shadow-inner mb-4 flex justify-between px-2 items-center">
+<div class="w-1 h-1 rounded-full bg-background"></div>
+<div class="w-1 h-1 rounded-full bg-background"></div>
+<div class="w-1 h-1 rounded-full bg-background"></div>
+</div>
+<!-- The Display Area (CRT Bubble Bezel) -->
+<div class="w-full h-[320px] bubble-bezel p-3 flex flex-col relative overflow-hidden" style="border-radius: 25% / 15%;">
+<!-- The Actual LCD Screen -->
+<div class="w-full h-full lcd-screen bubble-screen flex flex-col relative overflow-hidden px-2 py-4" style="border-radius: 22% / 12%; transform: scale(1.02);">
+<!-- Boot Sequence Screen -->
+<div class="absolute inset-0 flex flex-col items-center justify-center p-gutter z-10" id="boot-screen" style="display: none;">
+<div class="font-headline-lg text-headline-lg transition-opacity duration-500 scale-110 opacity-100" id="boot-text-link">LINK</div>
+<div class="font-status-pixel text-status-pixel mt-4 transition-opacity duration-500 opacity-100" id="boot-text-init">Initializing...</div>
+<div class="font-status-pixel text-status-pixel mt-2 transition-opacity duration-500 opacity-100" id="boot-text-ready">Ready.</div>
+</div>
+<!-- Home Screen -->
+<div class="absolute inset-0 flex flex-col w-full h-full pt-6 pb-4 px-4 z-10" id="home-screen" style="display: flex;">
+<!-- TopAppBar -->
+<div class="w-full h-8 flex justify-between items-start font-status-pixel text-status-pixel text-background">
+<span class="flex items-center gap-1">
+<span class="material-symbols-outlined" data-weight="fill" style="font-variation-settings: &quot;FILL&quot; 1; font-size: 16px;">signal_cellular_4_bar</span>
+<span class="material-symbols-outlined" data-weight="fill" style="font-variation-settings: &quot;FILL&quot; 1; font-size: 16px;">mail</span>
+</span>
+<span class="flex items-center gap-1">
+<span class="">11:57</span>
+<span class="material-symbols-outlined" data-weight="fill" style="font-variation-settings: &quot;FILL&quot; 1; font-size: 16px;">battery_full_alt</span>
+</span>
+</div>
+<!-- Main Content Area -->
+<div class="flex-grow flex flex-col items-center justify-center p-gutter relative transform scale-105">
+<!-- Placeholder for central content if needed, keeping empty based on pure reference -->
+</div>
+<!-- BottomNavBar / Soft Keys -->
+<div class="w-full flex justify-between items-end font-label-caps text-label-caps text-background font-bold tracking-widest mt-auto pb-1">
+<span class="">Menu</span>
+<span class="text-sm scale-110">ArabianTune</span>
+<span class="">Back</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Hardware Controls Section -->
+<div class="flex-grow mt-6 flex flex-col">
+<!-- D-Pad Area -->
+<div class="flex justify-center mb-6 h-24">
+<div class="relative w-24 h-24 rounded-full bg-surface-container-high shadow-inner p-1 flex items-center justify-center border border-outline-variant">
+<!-- D-Pad Directions -->
+<div class="absolute top-0 w-8 h-8 hardware-btn rounded-t-lg flex items-center justify-center cursor-pointer" data-key="ArrowUp">
+<span class="material-symbols-outlined text-outline" style="font-size: 16px;">arrow_drop_up</span>
+</div>
+<div class="absolute bottom-0 w-8 h-8 hardware-btn rounded-b-lg flex items-center justify-center cursor-pointer" data-key="ArrowDown">
+<span class="material-symbols-outlined text-outline" style="font-size: 16px;">arrow_drop_down</span>
+</div>
+<div class="absolute left-0 w-8 h-8 hardware-btn rounded-l-lg flex items-center justify-center cursor-pointer" data-key="ArrowLeft">
+<span class="material-symbols-outlined text-outline" style="font-size: 16px;">arrow_left</span>
+</div>
+<div class="absolute right-0 w-8 h-8 hardware-btn rounded-r-lg flex items-center justify-center cursor-pointer" data-key="ArrowRight">
+<span class="material-symbols-outlined text-outline" style="font-size: 16px;">arrow_right</span>
+</div>
+<!-- Select Button -->
+<div class="w-10 h-10 dpad-center rounded-full flex items-center justify-center cursor-pointer z-10 border border-background" data-key="Enter">
+</div>
+</div>
+</div>
+<!-- QWERTY Keyboard -->
+<div class="grid grid-cols-10 gap-key-gap px-1 mt-auto">
+<!-- Row 1 -->
+<div class="hardware-btn h-6 rounded-sm flex items-center justify-center font-status-pixel text-status-pixel text-primary-container cursor-pointer" data-key="q">Q</div>
+<div class="hardware-btn h-6 rounded-sm flex items-center justify-center font-status-pixel text-status-pixel text-primary-container cursor-pointer" data-key="w">W</div>
+<div class="hardware-btn h-6 rounded-sm flex items-center justify-center font-status-pixel text-status-pixel text-primary-container cursor-pointer" data-key="e">E</div>
+<div class="hardware-btn h-6 rounded-sm flex items-center justify-center font-status-pixel text-status-pixel text-primary-container cursor-pointer" data-key="r">R</div>
+<div class="hardware-btn h-6 rounded-sm flex items-center justify-center font-status-pixel text-status-pixel text-primary-container cursor-pointer" data-key="t">T</div>
+<div class="hardware-btn h-6 rounded-sm flex items-center justify-center font-status-pixel text-status-pixel text-primary-container cursor-pointer" data-key="y">Y</div>
+<div class="hardware-btn h-6 rounded-sm flex items-center justify-center font-status-pixel text-status-pixel text-primary-container cursor-pointer" data-key="u">U</div>
+<div class="hardware-btn h-6 rounded-sm flex items-center justify-center font-status-pixel text-status-pixel text-primary-container cursor-pointer" data-key="i">I</div>
+<div class="hardware-btn h-6 rounded-sm flex items-center justify-center font-status-pixel text-status-pixel text-primary-container cursor-pointer" data-key="o">O</div>
+<div class="hardware-btn h-6 rounded-sm flex items-center justify-center font-status-pixel text-status-pixel text-primary-container cursor-pointer" data-key="p">P</div>
+<!-- Row 2 -->
+<div class="col-start-1 col-span-1"></div> <!-- offset -->
+<div class="hardware-btn h-6 rounded-sm flex items-center justify-center font-status-pixel text-status-pixel text-primary-container cursor-pointer col-start-2" data-key="a">A</div>
+<div class="hardware-btn h-6 rounded-sm flex items-center justify-center font-status-pixel text-status-pixel text-primary-container cursor-pointer" data-key="s">S</div>
+<div class="hardware-btn h-6 rounded-sm flex items-center justify-center font-status-pixel text-status-pixel text-primary-container cursor-pointer" data-key="d">D</div>
+<div class="hardware-btn h-6 rounded-sm flex items-center justify-center font-status-pixel text-status-pixel text-primary-container cursor-pointer" data-key="f">F</div>
+<div class="hardware-btn h-6 rounded-sm flex items-center justify-center font-status-pixel text-status-pixel text-primary-container cursor-pointer" data-key="g">G</div>
+<div class="hardware-btn h-6 rounded-sm flex items-center justify-center font-status-pixel text-status-pixel text-primary-container cursor-pointer" data-key="h">H</div>
+<div class="hardware-btn h-6 rounded-sm flex items-center justify-center font-status-pixel text-status-pixel text-primary-container cursor-pointer" data-key="j">J</div>
+<div class="hardware-btn h-6 rounded-sm flex items-center justify-center font-status-pixel text-status-pixel text-primary-container cursor-pointer" data-key="k">K</div>
+<div class="hardware-btn h-6 rounded-sm flex items-center justify-center font-status-pixel text-status-pixel text-primary-container cursor-pointer" data-key="l">L</div>
+<!-- Row 3 -->
+<div class="col-start-1 col-span-2 hardware-btn h-6 rounded-sm flex items-center justify-center font-status-pixel text-status-pixel text-outline cursor-pointer" data-key="Shift">^</div>
+<div class="hardware-btn h-6 rounded-sm flex items-center justify-center font-status-pixel text-status-pixel text-primary-container cursor-pointer" data-key="z">Z</div>
+<div class="hardware-btn h-6 rounded-sm flex items-center justify-center font-status-pixel text-status-pixel text-primary-container cursor-pointer" data-key="x">X</div>
+<div class="hardware-btn h-6 rounded-sm flex items-center justify-center font-status-pixel text-status-pixel text-primary-container cursor-pointer" data-key="c">C</div>
+<div class="hardware-btn h-6 rounded-sm flex items-center justify-center font-status-pixel text-status-pixel text-primary-container cursor-pointer" data-key="v">V</div>
+<div class="hardware-btn h-6 rounded-sm flex items-center justify-center font-status-pixel text-status-pixel text-primary-container cursor-pointer" data-key="b">B</div>
+<div class="hardware-btn h-6 rounded-sm flex items-center justify-center font-status-pixel text-status-pixel text-primary-container cursor-pointer" data-key="n">N</div>
+<div class="hardware-btn h-6 rounded-sm flex items-center justify-center font-status-pixel text-status-pixel text-primary-container cursor-pointer" data-key="m">M</div>
+<div class="hardware-btn h-6 rounded-sm flex items-center justify-center font-status-pixel text-status-pixel text-outline cursor-pointer" data-key="Backspace">&lt;-</div>
+<!-- Row 4 -->
+<div class="col-start-1 col-span-2 hardware-btn h-6 rounded-sm flex items-center justify-center font-status-pixel text-status-pixel text-outline cursor-pointer" data-key="Escape">ESC</div>
+<div class="hardware-btn h-6 rounded-sm flex items-center justify-center font-status-pixel text-status-pixel text-primary-container cursor-pointer" data-key=",">,</div>
+<div class="col-span-4 hardware-btn h-6 rounded-sm flex items-center justify-center font-status-pixel text-status-pixel text-primary-container cursor-pointer" data-key=" ">_</div>
+<div class="hardware-btn h-6 rounded-sm flex items-center justify-center font-status-pixel text-status-pixel text-primary-container cursor-pointer" data-key=".">.</div>
+<div class="col-span-2 hardware-btn h-6 rounded-sm flex items-center justify-center font-status-pixel text-status-pixel text-outline cursor-pointer" data-key="Enter">ENT</div>
+</div>
+<!-- Microphone hole -->
+<div class="w-1 h-1 rounded-full bg-background mx-auto mt-4 mb-2 shadow-inner"></div>
+</div>
+</div>
+<script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const bootScreen = document.getElementById('boot-screen');
+            const homeScreen = document.getElementById('home-screen');
+            const bootTextLink = document.getElementById('boot-text-link');
+            const bootTextInit = document.getElementById('boot-text-init');
+            const bootTextReady = document.getElementById('boot-text-ready');
+
+            // Boot Sequence Logic
+            setTimeout(() => {
+                bootTextLink.classList.remove('opacity-0');
+                bootTextLink.classList.add('opacity-100');
+            }, 500);
+
+            setTimeout(() => {
+                bootTextInit.classList.remove('opacity-0');
+                bootTextInit.classList.add('opacity-100');
+            }, 1500);
+
+            setTimeout(() => {
+                bootTextReady.classList.remove('opacity-0');
+                bootTextReady.classList.add('opacity-100');
+            }, 2500);
+
+            setTimeout(() => {
+                bootScreen.style.display = 'none';
+                homeScreen.style.display = 'flex';
+            }, 3500);
+
+            // Hardware Keyboard visual feedback
+            const keys = document.querySelectorAll('[data-key]');
+            
+            function triggerKeyVisual(keyVal) {
+                const keyEl = Array.from(keys).find(k => k.dataset.key.toLowerCase() === keyVal.toLowerCase());
+                if (keyEl) {
+                    keyEl.classList.add('active');
+                    setTimeout(() => keyEl.classList.remove('active'), 150);
+                }
+            }
+
+            document.addEventListener('keydown', (e) => {
+                let keyToTrigger = e.key;
+                if(e.code === 'Space') keyToTrigger = ' ';
+                triggerKeyVisual(keyToTrigger);
+            });
+
+            // Click support for on-screen physical keys
+            keys.forEach(key => {
+                key.addEventListener('mousedown', function() {
+                    this.classList.add('active');
+                });
+                key.addEventListener('mouseup', function() {
+                    this.classList.remove('active');
+                });
+                key.addEventListener('mouseleave', function() {
+                    this.classList.remove('active');
+                });
+                // Touch support
+                key.addEventListener('touchstart', function(e) {
+                    e.preventDefault();
+                    this.classList.add('active');
+                });
+                key.addEventListener('touchend', function(e) {
+                    e.preventDefault();
+                    this.classList.remove('active');
+                });
+            });
+        });
+    </script>
+
+
+</body></html>

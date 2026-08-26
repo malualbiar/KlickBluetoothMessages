@@ -2,6 +2,14 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<key>NSBluetoothAlwaysUsageDescription</key>
+	<string>Klick requires Bluetooth to discover and message nearby devices offline.</string>
+	<key>NSBluetoothPeripheralUsageDescription</key>
+	<string>Klick requires Bluetooth to advertise and receive messages from nearby devices.</string>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>Klick uses local networking for fast peer-to-peer messaging.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Klick requires location access to detect nearby Bluetooth devices.</string>
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
 	<key>CFBundleDevelopmentRegion</key>

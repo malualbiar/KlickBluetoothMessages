@@ -3,6 +3,7 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../models/bluetooth_device.dart';
+import '../services/bluetooth_service.dart';
 import '../theme/bit_mechanical_theme.dart';
 
 enum KlickScreen {
@@ -18,6 +19,9 @@ class KlickController extends ChangeNotifier {
 
   // Theme
   LcdThemeMode lcdTheme = LcdThemeMode.amberGold;
+
+  // Local Device Identity
+  String localDeviceName = 'KLICK Terminal';
 
   // Active Key Pressed (for tactile hardware visual state)
   String? activeHardwareKey;
@@ -36,16 +40,117 @@ class KlickController extends ChangeNotifier {
 
   // Discovery / Scanner
   bool isScanning = false;
-  Timer? _scanTimer;
+  Timer? _scanFallbackTimer;
   List<KlickDevice> discoveredDevices = [];
+
+  // Bluetooth Service
+  final BluetoothService _bluetoothService;
 
   // Clock
   String currentTimeString = '11:57';
   Timer? _clockTimer;
 
-  KlickController() {
+  KlickController({BluetoothService? bluetoothService})
+      : _bluetoothService = bluetoothService ?? NearbyBluetoothService() {
+    _initBluetoothListeners();
     _initDemoData();
     _startClockTimer();
+    _initRadio();
+  }
+
+  void _initBluetoothListeners() {
+    _bluetoothService.onDeviceFound = (device) {
+      if (!discoveredDevices.any((d) => d.id == device.id)) {
+        discoveredDevices.add(device);
+        notifyListeners();
+      }
+    };
+
+    _bluetoothService.onDeviceLost = (endpointId) {
+      discoveredDevices.removeWhere((d) => d.id == endpointId);
+      notifyListeners();
+    };
+
+    _bluetoothService.onConnected = (endpointId, name) {
+      final index = devices.indexWhere((d) => d.id == endpointId);
+      if (index != -1) {
+        devices[index] = devices[index].copyWith(isConnected: true);
+      } else {
+        final newDev = KlickDevice(
+          id: endpointId,
+          name: name.isNotEmpty ? name : 'Bluetooth Contact',
+          macAddress: endpointId,
+          rssi: -50,
+          isConnected: true,
+          deviceType: DeviceType.smartphone,
+          lastSeen: DateTime.now(),
+        );
+        devices.insert(0, newDev);
+      }
+      notifyListeners();
+    };
+
+    _bluetoothService.onDisconnected = (endpointId) {
+      final index = devices.indexWhere((d) => d.id == endpointId);
+      if (index != -1) {
+        devices[index] = devices[index].copyWith(isConnected: false);
+        notifyListeners();
+      }
+    };
+
+    _bluetoothService.onMessageReceived = (endpointId, message) {
+      _handleIncomingMessage(endpointId, message);
+    };
+  }
+
+  Future<void> _initRadio() async {
+    final granted = await _bluetoothService.requestPermissions();
+    if (granted) {
+      await _bluetoothService.startAdvertising(localDeviceName);
+    }
+  }
+
+  void _handleIncomingMessage(String endpointId, String text) {
+    final msg = KlickMessage(
+      id: 'rx_${DateTime.now().millisecondsSinceEpoch}',
+      senderId: endpointId,
+      senderName: _getDeviceName(endpointId),
+      text: text,
+      timestamp: DateTime.now(),
+      status: MessageStatus.received,
+      isMe: false,
+    );
+
+    final list = List<KlickMessage>.from(conversationMessages[endpointId] ?? []);
+    list.add(msg);
+    conversationMessages[endpointId] = list;
+
+    // Update unread count if not currently in active chat with this device
+    if (currentScreen != KlickScreen.conversation ||
+        activeChatDevice?.id != endpointId) {
+      final idx = devices.indexWhere((d) => d.id == endpointId);
+      if (idx != -1) {
+        devices[idx] = devices[idx].copyWith(
+          unreadCount: devices[idx].unreadCount + 1,
+        );
+      }
+    }
+
+    notifyListeners();
+  }
+
+  String _getDeviceName(String endpointId) {
+    final dev = devices.firstWhere(
+      (d) => d.id == endpointId,
+      orElse: () => KlickDevice(
+        id: endpointId,
+        name: 'Nearby Device',
+        macAddress: endpointId,
+        rssi: -50,
+        lastSeen: DateTime.now(),
+      ),
+    );
+    return dev.name;
   }
 
   void _startClockTimer() {
@@ -302,79 +407,82 @@ class KlickController extends ChangeNotifier {
     conversationMessages[device.id] = list;
     notifyListeners();
 
-    // Simulate real Bluetooth peer reply
-    Timer(const Duration(milliseconds: 1500), () {
-      final replies = [
-        'Got your message!',
-        'Sounds good, connecting now.',
-        'Message received via Bluetooth.',
-        'Thanks for the update!',
-      ];
-      final replyText = replies[Random().nextInt(replies.length)];
+    // Send real Bluetooth payload
+    _bluetoothService.sendMessage(device.id, text);
 
-      final reply = KlickMessage(
-        id: 'reply_${DateTime.now().millisecondsSinceEpoch}',
-        senderId: device.id,
-        senderName: device.name,
-        text: replyText,
-        timestamp: DateTime.now(),
-        status: MessageStatus.received,
-        isMe: false,
-      );
+    // If simulating in demo/test mode with mock devices
+    if (device.id.startsWith('dev_')) {
+      Timer(const Duration(milliseconds: 1500), () {
+        final replies = [
+          'Got your message!',
+          'Sounds good, connecting now.',
+          'Message received via Bluetooth.',
+          'Thanks for the update!',
+        ];
+        final replyText = replies[Random().nextInt(replies.length)];
 
-      final updated = List<KlickMessage>.from(conversationMessages[device.id] ?? []);
-      updated.add(reply);
-      conversationMessages[device.id] = updated;
-      notifyListeners();
-    });
+        final reply = KlickMessage(
+          id: 'reply_${DateTime.now().millisecondsSinceEpoch}',
+          senderId: device.id,
+          senderName: device.name,
+          text: replyText,
+          timestamp: DateTime.now(),
+          status: MessageStatus.received,
+          isMe: false,
+        );
+
+        final updated = List<KlickMessage>.from(conversationMessages[device.id] ?? []);
+        updated.add(reply);
+        conversationMessages[device.id] = updated;
+        notifyListeners();
+      });
+    }
   }
 
   // Bluetooth Scanner
-  void startDiscoveryScan() {
+  Future<void> startDiscoveryScan() async {
     isScanning = true;
     discoveredDevices.clear();
     notifyListeners();
 
-    _scanTimer?.cancel();
+    final granted = await _bluetoothService.requestPermissions();
+    if (granted) {
+      await _bluetoothService.startDiscovery(localDeviceName);
+    }
+
+    // Fallback timer for demo / tests
+    _scanFallbackTimer?.cancel();
     int step = 0;
-    _scanTimer = Timer.periodic(const Duration(milliseconds: 400), (timer) {
+    _scanFallbackTimer = Timer.periodic(const Duration(milliseconds: 400), (timer) {
       step++;
       if (step == 1) {
-        discoveredDevices.add(
-          KlickDevice(
-            id: 'disc_01',
-            name: 'Sarah (Pixel 8)',
-            macAddress: 'D4:F5:13:88:99:A1',
-            rssi: -52,
-            isConnected: false,
-            deviceType: DeviceType.smartphone,
-            lastSeen: DateTime.now(),
-          ),
-        );
+        if (!discoveredDevices.any((d) => d.id == 'disc_01')) {
+          discoveredDevices.add(
+            KlickDevice(
+              id: 'disc_01',
+              name: 'Sarah (Pixel 8)',
+              macAddress: 'D4:F5:13:88:99:A1',
+              rssi: -52,
+              isConnected: false,
+              deviceType: DeviceType.smartphone,
+              lastSeen: DateTime.now(),
+            ),
+          );
+        }
       } else if (step == 3) {
-        discoveredDevices.add(
-          KlickDevice(
-            id: 'disc_02',
-            name: 'Office Headset',
-            macAddress: '1A:89:C4:00:22:9E',
-            rssi: -67,
-            isConnected: false,
-            deviceType: DeviceType.klickTerminal,
-            lastSeen: DateTime.now(),
-          ),
-        );
-      } else if (step == 5) {
-        discoveredDevices.add(
-          KlickDevice(
-            id: 'disc_03',
-            name: 'Sam (MacBook)',
-            macAddress: '84:CC:A8:11:7F:43',
-            rssi: -79,
-            isConnected: false,
-            deviceType: DeviceType.klickTerminal,
-            lastSeen: DateTime.now(),
-          ),
-        );
+        if (!discoveredDevices.any((d) => d.id == 'disc_02')) {
+          discoveredDevices.add(
+            KlickDevice(
+              id: 'disc_02',
+              name: 'Office Headset',
+              macAddress: '1A:89:C4:00:22:9E',
+              rssi: -67,
+              isConnected: false,
+              deviceType: DeviceType.klickTerminal,
+              lastSeen: DateTime.now(),
+            ),
+          );
+        }
       }
 
       if (step >= 6) {
@@ -385,7 +493,9 @@ class KlickController extends ChangeNotifier {
     });
   }
 
-  void connectDiscoveredDevice(KlickDevice device) {
+  Future<void> connectDiscoveredDevice(KlickDevice device) async {
+    await _bluetoothService.connect(device.id, localDeviceName);
+
     if (!devices.any((d) => d.id == device.id)) {
       final paired = device.copyWith(isConnected: true);
       devices.insert(0, paired);
@@ -410,9 +520,10 @@ class KlickController extends ChangeNotifier {
   @override
   void dispose() {
     _clockTimer?.cancel();
-    _scanTimer?.cancel();
+    _scanFallbackTimer?.cancel();
     _keyReleaseTimer?.cancel();
     textInputController.dispose();
+    _bluetoothService.dispose();
     super.dispose();
   }
 }
