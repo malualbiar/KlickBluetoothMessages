@@ -11,7 +11,9 @@ void main() {
 }
 
 class KlickApp extends StatelessWidget {
-  const KlickApp({super.key});
+  final KlickController? controller;
+
+  const KlickApp({super.key, this.controller});
 
   @override
   Widget build(BuildContext context) {
@@ -26,13 +28,15 @@ class KlickApp extends StatelessWidget {
           surface: BitMechanicalTheme.hardwareBody,
         ),
       ),
-      home: const KlickMainScreen(),
+      home: KlickMainScreen(controller: controller),
     );
   }
 }
 
 class KlickMainScreen extends StatefulWidget {
-  const KlickMainScreen({super.key});
+  final KlickController? controller;
+
+  const KlickMainScreen({super.key, this.controller});
 
   @override
   State<KlickMainScreen> createState() => _KlickMainScreenState();
@@ -40,12 +44,14 @@ class KlickMainScreen extends StatefulWidget {
 
 class _KlickMainScreenState extends State<KlickMainScreen> {
   late final KlickController _controller;
+  bool _isExternalController = false;
   final FocusNode _keyboardFocusNode = FocusNode();
 
   @override
   void initState() {
     super.initState();
-    _controller = KlickController();
+    _isExternalController = widget.controller != null;
+    _controller = widget.controller ?? KlickController();
     _controller.addListener(_onControllerUpdate);
 
     // Register physical hardware keyboard listener
@@ -101,7 +107,9 @@ class _KlickMainScreenState extends State<KlickMainScreen> {
   void dispose() {
     HardwareKeyboard.instance.removeHandler(_handlePhysicalKeyEvent);
     _controller.removeListener(_onControllerUpdate);
-    _controller.dispose();
+    if (!_isExternalController) {
+      _controller.dispose();
+    }
     _keyboardFocusNode.dispose();
     super.dispose();
   }

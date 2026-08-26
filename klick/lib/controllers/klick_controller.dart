@@ -29,7 +29,7 @@ class KlickController extends ChangeNotifier {
   LcdThemeMode lcdTheme = LcdThemeMode.amberGold;
 
   // Local Device Identity
-  String localDeviceName = 'KLICK Terminal';
+  late final String localDeviceName;
 
   // Active Key Pressed (for tactile hardware visual state)
   String? activeHardwareKey;
@@ -41,14 +41,14 @@ class KlickController extends ChangeNotifier {
   // Text Input buffer (for QWERTY input / composer)
   final TextEditingController textInputController = TextEditingController();
 
-  // Devices & Conversations
+  // Devices & Conversations (Real physical devices only)
   List<KlickDevice> devices = [];
   Map<String, List<KlickMessage>> conversationMessages = {};
   KlickDevice? activeChatDevice;
 
   // Discovery / Scanner
   bool isScanning = false;
-  Timer? _scanFallbackTimer;
+  Timer? _scanTimeoutTimer;
   List<KlickDevice> discoveredDevices = [];
 
   // Bluetooth Service
@@ -60,8 +60,8 @@ class KlickController extends ChangeNotifier {
 
   KlickController({BluetoothService? bluetoothService})
       : _bluetoothService = bluetoothService ?? NearbyBluetoothService() {
+    localDeviceName = 'KLICK-${Random().nextInt(9000) + 1000}';
     _initBluetoothListeners();
-    _initDemoData();
     _startClockTimer();
     _initRadio();
   }
@@ -81,12 +81,13 @@ class KlickController extends ChangeNotifier {
 
     _bluetoothService.onConnected = (endpointId, name) {
       final index = devices.indexWhere((d) => d.id == endpointId);
+      final devName = name.isNotEmpty ? name : 'Nearby Contact';
       if (index != -1) {
-        devices[index] = devices[index].copyWith(isConnected: true);
+        devices[index] = devices[index].copyWith(isConnected: true, name: devName);
       } else {
         final newDev = KlickDevice(
           id: endpointId,
-          name: name.isNotEmpty ? name : 'Bluetooth Contact',
+          name: devName,
           macAddress: endpointId,
           rssi: -50,
           isConnected: true,
@@ -94,6 +95,7 @@ class KlickController extends ChangeNotifier {
           lastSeen: DateTime.now(),
         );
         devices.insert(0, newDev);
+        conversationMessages[endpointId] ??= [];
       }
       notifyListeners();
     };
@@ -119,6 +121,20 @@ class KlickController extends ChangeNotifier {
   }
 
   void _handleIncomingMessage(String endpointId, String text) {
+    // Ensure device exists in contacts list
+    if (!devices.any((d) => d.id == endpointId)) {
+      final newDev = KlickDevice(
+        id: endpointId,
+        name: 'Nearby Contact',
+        macAddress: endpointId,
+        rssi: -50,
+        isConnected: true,
+        deviceType: DeviceType.smartphone,
+        lastSeen: DateTime.now(),
+      );
+      devices.insert(0, newDev);
+    }
+
     final msg = KlickMessage(
       id: 'rx_${DateTime.now().millisecondsSinceEpoch}',
       senderId: endpointId,
@@ -152,7 +168,7 @@ class KlickController extends ChangeNotifier {
       (d) => d.id == endpointId,
       orElse: () => KlickDevice(
         id: endpointId,
-        name: 'Nearby Device',
+        name: 'Nearby Contact',
         macAddress: endpointId,
         rssi: -50,
         lastSeen: DateTime.now(),
@@ -177,97 +193,6 @@ class KlickController extends ChangeNotifier {
       currentTimeString = newTime;
       notifyListeners();
     }
-  }
-
-  void _initDemoData() {
-    final now = DateTime.now();
-
-    devices = [
-      KlickDevice(
-        id: 'dev_01',
-        name: 'Alex (Phone)',
-        macAddress: 'AC:22:98:54:10:0A',
-        rssi: -45,
-        isConnected: true,
-        deviceType: DeviceType.smartphone,
-        lastSeen: now.subtract(const Duration(minutes: 2)),
-        unreadCount: 1,
-      ),
-      KlickDevice(
-        id: 'dev_02',
-        name: 'Maya (Laptop)',
-        macAddress: 'F4:84:4C:19:BE:88',
-        rssi: -58,
-        isConnected: true,
-        deviceType: DeviceType.klickTerminal,
-        lastSeen: now.subtract(const Duration(minutes: 8)),
-        unreadCount: 0,
-      ),
-      KlickDevice(
-        id: 'dev_03',
-        name: 'David (Tablet)',
-        macAddress: 'E0:D5:5E:7B:12:44',
-        rssi: -72,
-        isConnected: false,
-        deviceType: DeviceType.smartphone,
-        lastSeen: now.subtract(const Duration(minutes: 25)),
-        unreadCount: 0,
-      ),
-    ];
-
-    conversationMessages = {
-      'dev_01': [
-        KlickMessage(
-          id: 'm1',
-          senderId: 'dev_01',
-          senderName: 'Alex',
-          text: 'Hey! Connected via Bluetooth.',
-          timestamp: now.subtract(const Duration(minutes: 15)),
-          status: MessageStatus.acknowledged,
-          isMe: false,
-        ),
-        KlickMessage(
-          id: 'm2',
-          senderId: 'me',
-          senderName: 'Me',
-          text: 'Great, Bluetooth messaging is working smoothly.',
-          timestamp: now.subtract(const Duration(minutes: 10)),
-          status: MessageStatus.acknowledged,
-          isMe: true,
-        ),
-        KlickMessage(
-          id: 'm3',
-          senderId: 'dev_01',
-          senderName: 'Alex',
-          text: 'Are you nearby? Send me the notes.',
-          timestamp: now.subtract(const Duration(minutes: 2)),
-          status: MessageStatus.received,
-          isMe: false,
-        ),
-      ],
-      'dev_02': [
-        KlickMessage(
-          id: 'm20',
-          senderId: 'dev_02',
-          senderName: 'Maya',
-          text: 'Files received over Bluetooth transfer.',
-          timestamp: now.subtract(const Duration(minutes: 8)),
-          status: MessageStatus.received,
-          isMe: false,
-        ),
-      ],
-      'dev_03': [
-        KlickMessage(
-          id: 'm30',
-          senderId: 'dev_03',
-          senderName: 'David',
-          text: 'See you in the meeting room.',
-          timestamp: now.subtract(const Duration(minutes: 25)),
-          status: MessageStatus.received,
-          isMe: false,
-        ),
-      ],
-    };
   }
 
   // Navigation
@@ -374,6 +299,9 @@ class KlickController extends ChangeNotifier {
       case KlickScreen.chats:
         if (devices.isNotEmpty && listFocusIndex < devices.length) {
           openChat(devices[listFocusIndex]);
+        } else {
+          startDiscoveryScan();
+          navigateTo(KlickScreen.scan);
         }
         break;
       case KlickScreen.scan:
@@ -415,40 +343,17 @@ class KlickController extends ChangeNotifier {
     conversationMessages[device.id] = list;
     notifyListeners();
 
-    // Send real Bluetooth payload
+    // Send real Bluetooth payload to physical device
     _bluetoothService.sendMessage(device.id, text);
-
-    // If simulating in demo/test mode with mock devices
-    if (device.id.startsWith('dev_')) {
-      Timer(const Duration(milliseconds: 1500), () {
-        final replies = [
-          'Got your message!',
-          'Sounds good, connecting now.',
-          'Message received via Bluetooth.',
-          'Thanks for the update!',
-        ];
-        final replyText = replies[Random().nextInt(replies.length)];
-
-        final reply = KlickMessage(
-          id: 'reply_${DateTime.now().millisecondsSinceEpoch}',
-          senderId: device.id,
-          senderName: device.name,
-          text: replyText,
-          timestamp: DateTime.now(),
-          status: MessageStatus.received,
-          isMe: false,
-        );
-
-        final updated = List<KlickMessage>.from(conversationMessages[device.id] ?? []);
-        updated.add(reply);
-        conversationMessages[device.id] = updated;
-        notifyListeners();
-      });
-    }
   }
 
-  // Bluetooth Scanner
+  // Real Bluetooth Scanner
   Future<void> startDiscoveryScan() async {
+    if (isScanning) {
+      await stopDiscoveryScan();
+      return;
+    }
+
     isScanning = true;
     discoveredDevices.clear();
     notifyListeners();
@@ -458,47 +363,18 @@ class KlickController extends ChangeNotifier {
       await _bluetoothService.startDiscovery(localDeviceName);
     }
 
-    // Fallback timer for demo / tests
-    _scanFallbackTimer?.cancel();
-    int step = 0;
-    _scanFallbackTimer = Timer.periodic(const Duration(milliseconds: 400), (timer) {
-      step++;
-      if (step == 1) {
-        if (!discoveredDevices.any((d) => d.id == 'disc_01')) {
-          discoveredDevices.add(
-            KlickDevice(
-              id: 'disc_01',
-              name: 'Sarah (Pixel 8)',
-              macAddress: 'D4:F5:13:88:99:A1',
-              rssi: -52,
-              isConnected: false,
-              deviceType: DeviceType.smartphone,
-              lastSeen: DateTime.now(),
-            ),
-          );
-        }
-      } else if (step == 3) {
-        if (!discoveredDevices.any((d) => d.id == 'disc_02')) {
-          discoveredDevices.add(
-            KlickDevice(
-              id: 'disc_02',
-              name: 'Office Headset',
-              macAddress: '1A:89:C4:00:22:9E',
-              rssi: -67,
-              isConnected: false,
-              deviceType: DeviceType.klickTerminal,
-              lastSeen: DateTime.now(),
-            ),
-          );
-        }
-      }
-
-      if (step >= 6) {
-        isScanning = false;
-        timer.cancel();
-      }
-      notifyListeners();
+    // Auto timeout after 25 seconds of continuous scanning
+    _scanTimeoutTimer?.cancel();
+    _scanTimeoutTimer = Timer(const Duration(seconds: 25), () {
+      stopDiscoveryScan();
     });
+  }
+
+  Future<void> stopDiscoveryScan() async {
+    _scanTimeoutTimer?.cancel();
+    await _bluetoothService.stopDiscovery();
+    isScanning = false;
+    notifyListeners();
   }
 
   Future<void> connectDiscoveredDevice(KlickDevice device) async {
@@ -507,17 +383,7 @@ class KlickController extends ChangeNotifier {
     if (!devices.any((d) => d.id == device.id)) {
       final paired = device.copyWith(isConnected: true);
       devices.insert(0, paired);
-      conversationMessages[paired.id] = [
-        KlickMessage(
-          id: 'init_${DateTime.now().millisecondsSinceEpoch}',
-          senderId: paired.id,
-          senderName: paired.name,
-          text: 'Connected via Bluetooth.',
-          timestamp: DateTime.now(),
-          status: MessageStatus.received,
-          isMe: false,
-        ),
-      ];
+      conversationMessages[paired.id] ??= [];
       openChat(paired);
     } else {
       final existing = devices.firstWhere((d) => d.id == device.id);
@@ -528,7 +394,7 @@ class KlickController extends ChangeNotifier {
   @override
   void dispose() {
     _clockTimer?.cancel();
-    _scanFallbackTimer?.cancel();
+    _scanTimeoutTimer?.cancel();
     _keyReleaseTimer?.cancel();
     textInputController.dispose();
     _bluetoothService.dispose();

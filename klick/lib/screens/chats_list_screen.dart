@@ -68,11 +68,67 @@ class ChatsListScreen extends StatelessWidget {
         Expanded(
           child: controller.devices.isEmpty
               ? Center(
-                  child: Text(
-                    'No Bluetooth messages yet.\nTap "SCAN" to find nearby devices.',
-                    textAlign: TextAlign.center,
-                    style: BitMechanicalTheme.bodyMd(
-                      color: inkColor.withValues(alpha: 0.7),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.bluetooth,
+                          size: 26,
+                          color: inkColor.withValues(alpha: 0.6),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'NO BLUETOOTH CONTACTS',
+                          style: BitMechanicalTheme.bodyLg(
+                            color: inkColor,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Scan to discover nearby physical devices and start chatting offline.',
+                          textAlign: TextAlign.center,
+                          style: BitMechanicalTheme.bodyMd(
+                            color: inkColor.withValues(alpha: 0.75),
+                            height: 1.3,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        GestureDetector(
+                          onTap: () {
+                            controller.startDiscoveryScan();
+                            controller.navigateTo(KlickScreen.scan);
+                          },
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 10, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: inkColor,
+                              borderRadius: BorderRadius.circular(2),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.bluetooth_searching,
+                                  size: 13,
+                                  color: bgColor,
+                                ),
+                                const SizedBox(width: 5),
+                                Text(
+                                  'SCAN FOR RADIOS',
+                                  style: BitMechanicalTheme.statusPixel(
+                                    color: bgColor,
+                                    fontWeight: FontWeight.w900,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 )
