@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../models/bluetooth_device.dart';
 import '../services/bluetooth_service.dart';
+import '../services/notification_service.dart';
 import '../services/storage_service.dart';
 import '../theme/bit_mechanical_theme.dart';
 
@@ -14,8 +15,9 @@ enum KlickScreen {
 }
 
 class KlickController extends ChangeNotifier {
-  // Persistence
+  // Persistence & Notifications
   final StorageService _storageService;
+  final NotificationService _notificationService;
   bool isInitialized = false;
 
   // Onboarding
@@ -29,7 +31,7 @@ class KlickController extends ChangeNotifier {
     isOnboardingComplete = true;
     await _storageService.setOnboardingComplete(true);
 
-    // Restart advertising with verified identity
+    // Restart advertising with verified permanent callsign
     await _bluetoothService.stopAdvertising();
     await _bluetoothService.startAdvertising(localDeviceName);
 
@@ -59,7 +61,15 @@ class KlickController extends ChangeNotifier {
   // Devices & Conversations (Real physical devices + persisted history)
   List<KlickDevice> devices = [];
   Map<String, List<KlickMessage>> conversationMessages = {};
+  Map<String, List<KlickMessage>> pendingMessages = {};
   KlickDevice? activeChatDevice;
+
+  // Incoming Connection Request ("Username is trying to Klick!")
+  KlickConnectionRequest? activeConnectionRequest;
+
+  // In-App Notification Toast
+  String? inAppToast;
+  Timer? _toastTimer;
 
   // Discovery / Scanner
   bool isScanning = false;
@@ -76,14 +86,19 @@ class KlickController extends ChangeNotifier {
   KlickController({
     BluetoothService? bluetoothService,
     StorageService? storageService,
+    NotificationService? notificationService,
   })  : _bluetoothService = bluetoothService ?? NearbyBluetoothService(),
-        _storageService = storageService ?? StorageService() {
+        _storageService = storageService ?? StorageService(),
+        _notificationService = notificationService ?? NotificationService() {
+    _initBluetoothListeners();
     _initAsync();
     _startClockTimer();
   }
 
   Future<void> _initAsync() async {
     await _storageService.init();
+    await _notificationService.init();
+
     isOnboardingComplete = await _storageService.isOnboardingComplete();
     
     final savedName = await _storageService.getUserName();
@@ -93,13 +108,12 @@ class KlickController extends ChangeNotifier {
       localDeviceName = 'KLICK-${Random().nextInt(9000) + 1000}';
     }
 
-    // Load persisted contacts and messages
+    // Load persisted contacts, messages, and pending queue
     final loadedContacts = await _storageService.loadContacts();
-    // Mark loaded contacts as offline until connection is established
     devices = loadedContacts.map((d) => d.copyWith(isConnected: false)).toList();
     conversationMessages = await _storageService.loadMessages();
+    pendingMessages = await _storageService.loadPendingQueue();
 
-    _initBluetoothListeners();
     await _initRadio();
 
     isInitialized = true;
@@ -127,12 +141,38 @@ class KlickController extends ChangeNotifier {
       if (index != -1) {
         devices[index] = devices[index].copyWith(isConnected: false);
       }
+      if (activeChatDevice?.id == endpointId) {
+        activeChatDevice = activeChatDevice?.copyWith(isConnected: false);
+      }
+      notifyListeners();
+    };
+
+    // Interactive connection authorization ("Username is trying to Klick!")
+    _bluetoothService.onConnectionRequest = (endpointId, endpointName, accept, reject) {
+      final displayName = _getPreservedName(endpointId, endpointName);
+      activeConnectionRequest = KlickConnectionRequest(
+        endpointId: endpointId,
+        endpointName: displayName,
+        onAccept: () async {
+          await accept();
+          activeConnectionRequest = null;
+          notifyListeners();
+        },
+        onReject: () async {
+          await reject();
+          activeConnectionRequest = null;
+          notifyListeners();
+        },
+        timestamp: DateTime.now(),
+      );
+      HapticFeedback.heavyImpact();
       notifyListeners();
     };
 
     _bluetoothService.onConnected = (endpointId, name) {
-      final index = devices.indexWhere((d) => d.id == endpointId);
-      final devName = name.isNotEmpty ? name : 'Nearby Contact';
+      final index = devices.indexWhere((d) => d.id == endpointId || d.macAddress == endpointId);
+      final devName = _getPreservedName(endpointId, name);
+
       if (index != -1) {
         devices[index] = devices[index].copyWith(
           isConnected: true,
@@ -158,11 +198,15 @@ class KlickController extends ChangeNotifier {
       }
 
       _storageService.saveContacts(devices);
+
+      // Flush and deliver any queued messages for this peer!
+      _flushPendingQueue(endpointId);
+
       notifyListeners();
     };
 
     _bluetoothService.onDisconnected = (endpointId) {
-      final index = devices.indexWhere((d) => d.id == endpointId);
+      final index = devices.indexWhere((d) => d.id == endpointId || d.macAddress == endpointId);
       if (index != -1) {
         devices[index] = devices[index].copyWith(
           isConnected: false,
@@ -183,6 +227,36 @@ class KlickController extends ChangeNotifier {
     };
   }
 
+  void acceptConnectionRequest() {
+    activeConnectionRequest?.onAccept();
+  }
+
+  void rejectConnectionRequest() {
+    activeConnectionRequest?.onReject();
+  }
+
+  // Preserve established callsign and prevent overwriting with temporary generic names
+  String _getPreservedName(String endpointId, String incomingName) {
+    final existingIdx = devices.indexWhere((d) => d.id == endpointId || d.macAddress == endpointId);
+    if (existingIdx != -1) {
+      final existingName = devices[existingIdx].name;
+      if (existingName.isNotEmpty &&
+          existingName != 'Nearby Contact' &&
+          existingName != 'Nearby Device' &&
+          existingName != 'KLICK-USER') {
+        return existingName;
+      }
+    }
+
+    if (incomingName.isNotEmpty &&
+        incomingName != 'Nearby Contact' &&
+        incomingName != 'Nearby Device') {
+      return incomingName;
+    }
+
+    return 'Nearby Contact';
+  }
+
   Future<void> _initRadio() async {
     final granted = await _bluetoothService.requestPermissions();
     if (granted) {
@@ -191,11 +265,13 @@ class KlickController extends ChangeNotifier {
   }
 
   void _handleIncomingMessage(String endpointId, String text) {
+    final senderName = _getDeviceName(endpointId);
+
     // Ensure device exists in contacts list
-    if (!devices.any((d) => d.id == endpointId)) {
+    if (!devices.any((d) => d.id == endpointId || d.macAddress == endpointId)) {
       final newDev = KlickDevice(
         id: endpointId,
-        name: 'Nearby Contact',
+        name: senderName,
         macAddress: endpointId,
         rssi: -50,
         isConnected: true,
@@ -204,14 +280,14 @@ class KlickController extends ChangeNotifier {
       );
       devices.insert(0, newDev);
     } else {
-      final idx = devices.indexWhere((d) => d.id == endpointId);
+      final idx = devices.indexWhere((d) => d.id == endpointId || d.macAddress == endpointId);
       devices[idx] = devices[idx].copyWith(isConnected: true, lastSeen: DateTime.now());
     }
 
     final msg = KlickMessage(
       id: 'rx_${DateTime.now().millisecondsSinceEpoch}',
       senderId: endpointId,
-      senderName: _getDeviceName(endpointId),
+      senderName: senderName,
       text: text,
       timestamp: DateTime.now(),
       status: MessageStatus.received,
@@ -222,15 +298,22 @@ class KlickController extends ChangeNotifier {
     list.add(msg);
     conversationMessages[endpointId] = list;
 
-    // Update unread count if not currently in active chat with this device
-    if (currentScreen != KlickScreen.conversation ||
-        activeChatDevice?.id != endpointId) {
-      final idx = devices.indexWhere((d) => d.id == endpointId);
+    // Trigger in-app toast & local notification if not in active chat
+    final isInThisChat = currentScreen == KlickScreen.conversation && activeChatDevice?.id == endpointId;
+    if (!isInThisChat) {
+      final idx = devices.indexWhere((d) => d.id == endpointId || d.macAddress == endpointId);
       if (idx != -1) {
         devices[idx] = devices[idx].copyWith(
           unreadCount: devices[idx].unreadCount + 1,
         );
       }
+
+      showInAppToast('// NEW KLICK // $senderName: $text');
+      _notificationService.showMessageNotification(
+        title: 'Klick from $senderName',
+        body: text,
+        payload: endpointId,
+      );
     }
 
     // Persist messages and contacts
@@ -240,9 +323,21 @@ class KlickController extends ChangeNotifier {
     notifyListeners();
   }
 
+  void showInAppToast(String message) {
+    inAppToast = message;
+    HapticFeedback.lightImpact();
+    notifyListeners();
+
+    _toastTimer?.cancel();
+    _toastTimer = Timer(const Duration(seconds: 4), () {
+      inAppToast = null;
+      notifyListeners();
+    });
+  }
+
   String _getDeviceName(String endpointId) {
     final dev = devices.firstWhere(
-      (d) => d.id == endpointId,
+      (d) => d.id == endpointId || d.macAddress == endpointId,
       orElse: () => KlickDevice(
         id: endpointId,
         name: 'Nearby Contact',
@@ -284,7 +379,7 @@ class KlickController extends ChangeNotifier {
 
   void openChat(KlickDevice device) {
     activeChatDevice = device;
-    final idx = devices.indexWhere((d) => d.id == device.id);
+    final idx = devices.indexWhere((d) => d.id == device.id || d.macAddress == device.id);
     if (idx != -1) {
       devices[idx] = devices[idx].copyWith(unreadCount: 0);
       _storageService.saveContacts(devices);
@@ -395,7 +490,7 @@ class KlickController extends ChangeNotifier {
     }
   }
 
-  // Messaging actions
+  // Messaging actions with Store-and-Forward Queue
   void sendMessageFromInput() {
     final text = textInputController.text.trim();
     if (text.isEmpty || activeChatDevice == null) return;
@@ -406,13 +501,15 @@ class KlickController extends ChangeNotifier {
 
   void sendDirectMessage(KlickDevice device, String text) {
     final msgId = 'msg_${DateTime.now().millisecondsSinceEpoch}';
+    final isOnline = device.isConnected;
+
     final userMsg = KlickMessage(
       id: msgId,
       senderId: 'me',
       senderName: 'Me',
       text: text,
       timestamp: DateTime.now(),
-      status: MessageStatus.sent,
+      status: isOnline ? MessageStatus.sent : MessageStatus.queued,
       isMe: true,
     );
 
@@ -420,14 +517,75 @@ class KlickController extends ChangeNotifier {
     list.add(userMsg);
     conversationMessages[device.id] = list;
 
+    if (!isOnline) {
+      // Store in outgoing pending queue
+      final qList = List<KlickMessage>.from(pendingMessages[device.id] ?? []);
+      qList.add(userMsg);
+      pendingMessages[device.id] = qList;
+      _storageService.savePendingQueue(pendingMessages);
+      showInAppToast('// RADIO OFFLINE: MESSAGE QUEUED //');
+    } else {
+      // Transmit live over Bluetooth
+      _bluetoothService.sendMessage(device.id, text).then((success) {
+        if (!success) {
+          // If transmit failed, move to pending queue
+          _queueFailedMessage(device.id, userMsg);
+        }
+      });
+    }
+
     // Persist messages and contacts
     _storageService.saveMessages(conversationMessages);
     _storageService.saveContacts(devices);
 
     notifyListeners();
+  }
 
-    // Send real Bluetooth payload to physical device
-    _bluetoothService.sendMessage(device.id, text);
+  void _queueFailedMessage(String endpointId, KlickMessage originalMsg) {
+    final qMsg = originalMsg.copyWith(status: MessageStatus.queued);
+    final conv = List<KlickMessage>.from(conversationMessages[endpointId] ?? []);
+    final idx = conv.indexWhere((m) => m.id == originalMsg.id);
+    if (idx != -1) {
+      conv[idx] = qMsg;
+      conversationMessages[endpointId] = conv;
+    }
+
+    final qList = List<KlickMessage>.from(pendingMessages[endpointId] ?? []);
+    qList.add(qMsg);
+    pendingMessages[endpointId] = qList;
+
+    _storageService.savePendingQueue(pendingMessages);
+    _storageService.saveMessages(conversationMessages);
+    notifyListeners();
+  }
+
+  // Automatic Queue Flushing on Reconnect
+  Future<void> _flushPendingQueue(String endpointId) async {
+    final queue = pendingMessages[endpointId];
+    if (queue == null || queue.isEmpty) return;
+
+    debugPrint('Flushing ${queue.length} pending queued messages for $endpointId...');
+    final queueCopy = List<KlickMessage>.from(queue);
+    pendingMessages[endpointId] = [];
+    await _storageService.savePendingQueue(pendingMessages);
+
+    for (final qMsg in queueCopy) {
+      final success = await _bluetoothService.sendMessage(endpointId, qMsg.text);
+      if (success) {
+        final conv = List<KlickMessage>.from(conversationMessages[endpointId] ?? []);
+        final idx = conv.indexWhere((m) => m.id == qMsg.id);
+        if (idx != -1) {
+          conv[idx] = conv[idx].copyWith(status: MessageStatus.sent);
+          conversationMessages[endpointId] = conv;
+        }
+      } else {
+        // Re-queue if still failed
+        _queueFailedMessage(endpointId, qMsg);
+      }
+    }
+
+    await _storageService.saveMessages(conversationMessages);
+    notifyListeners();
   }
 
   // Real Bluetooth Scanner
@@ -461,6 +619,13 @@ class KlickController extends ChangeNotifier {
   }
 
   Future<void> connectDiscoveredDevice(KlickDevice device) async {
+    // If already known and paired, open directly
+    final existingIdx = devices.indexWhere((d) => d.id == device.id || d.macAddress == device.macAddress);
+    if (existingIdx != -1) {
+      openChat(devices[existingIdx]);
+      return;
+    }
+
     await _bluetoothService.connect(device.id, localDeviceName);
 
     if (!devices.any((d) => d.id == device.id)) {
@@ -481,6 +646,7 @@ class KlickController extends ChangeNotifier {
     _clockTimer?.cancel();
     _scanTimeoutTimer?.cancel();
     _keyReleaseTimer?.cancel();
+    _toastTimer?.cancel();
     textInputController.dispose();
     _bluetoothService.dispose();
     super.dispose();

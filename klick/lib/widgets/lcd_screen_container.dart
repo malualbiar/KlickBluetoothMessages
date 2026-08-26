@@ -189,6 +189,124 @@ class LcdScreenContainer extends StatelessWidget {
               ),
             ),
 
+            // In-App Toast Banner
+            if (controller.inAppToast != null)
+              Positioned(
+                top: 26,
+                left: 20,
+                right: 20,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: inkColor,
+                    borderRadius: BorderRadius.circular(3),
+                    boxShadow: const [
+                      BoxShadow(
+                        color: Color(0x66000000),
+                        offset: Offset(0, 2),
+                        blurRadius: 4,
+                      ),
+                    ],
+                  ),
+                  child: Text(
+                    controller.inAppToast!,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.center,
+                    style: BitMechanicalTheme.statusPixel(
+                      color: bgColor,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ),
+              ),
+
+            // Interactive Connection Request Modal ("Username is trying to Klick!")
+            if (controller.activeConnectionRequest != null)
+              Positioned.fill(
+                child: Container(
+                  color: Colors.black.withValues(alpha: 0.8),
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: Center(
+                    child: Container(
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: bgColor,
+                        border: Border.all(color: inkColor, width: 2),
+                        boxShadow: [
+                          BoxShadow(
+                            color: inkColor.withValues(alpha: 0.35),
+                            blurRadius: 16,
+                          ),
+                        ],
+                      ),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            '// INCOMING KLICK //',
+                            style: BitMechanicalTheme.statusPixel(
+                              color: inkColor,
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: 1.0,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            '${controller.activeConnectionRequest!.endpointName}\nis trying to Klick!',
+                            textAlign: TextAlign.center,
+                            style: BitMechanicalTheme.headlineMono(
+                              color: inkColor,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                          const SizedBox(height: 14),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                            children: [
+                              GestureDetector(
+                                onTap: controller.rejectConnectionRequest,
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 10, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    border:
+                                        Border.all(color: inkColor, width: 1.2),
+                                  ),
+                                  child: Text(
+                                    'REJECT',
+                                    style: BitMechanicalTheme.statusPixel(
+                                      color: inkColor,
+                                      fontWeight: FontWeight.w900,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              GestureDetector(
+                                onTap: controller.acceptConnectionRequest,
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 10, vertical: 4),
+                                  color: inkColor,
+                                  child: Text(
+                                    'ACCEPT',
+                                    style: BitMechanicalTheme.statusPixel(
+                                      color: bgColor,
+                                      fontWeight: FontWeight.w900,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+
             // Outer Bubble Border / Bezel Frame
             Positioned.fill(
               child: IgnorePointer(

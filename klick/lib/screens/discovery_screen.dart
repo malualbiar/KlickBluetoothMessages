@@ -123,6 +123,9 @@ class DiscoveryScreen extends StatelessWidget {
                     final device = controller.discoveredDevices[index];
                     final isFocused = controller.listFocusIndex == index;
 
+                    final isAlreadyFriend = controller.devices.any(
+                        (d) => d.id == device.id || d.macAddress == device.id);
+
                     return GestureDetector(
                       onTap: () {
                         controller.listFocusIndex = index;
@@ -145,7 +148,7 @@ class DiscoveryScreen extends StatelessWidget {
                         child: Row(
                           children: [
                             Icon(
-                              Icons.bluetooth,
+                              isAlreadyFriend ? Icons.star : Icons.bluetooth,
                               size: 14,
                               color: isFocused ? bgColor : inkColor,
                             ),
@@ -153,25 +156,68 @@ class DiscoveryScreen extends StatelessWidget {
 
                             // Device info
                             Expanded(
-                              child: Text(
-                                device.name,
-                                overflow: TextOverflow.ellipsis,
-                                style: BitMechanicalTheme.bodyLg(
-                                  color: isFocused ? bgColor : inkColor,
-                                  fontWeight: FontWeight.w800,
-                                ),
+                              child: Row(
+                                children: [
+                                  Flexible(
+                                    child: Text(
+                                      device.name,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: BitMechanicalTheme.bodyLg(
+                                        color: isFocused ? bgColor : inkColor,
+                                        fontWeight: FontWeight.w800,
+                                      ),
+                                    ),
+                                  ),
+                                  if (isAlreadyFriend) ...[
+                                    const SizedBox(width: 4),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 3, vertical: 1),
+                                      decoration: BoxDecoration(
+                                        color: isFocused
+                                            ? bgColor
+                                            : inkColor.withValues(alpha: 0.15),
+                                        borderRadius: BorderRadius.circular(2),
+                                        border: Border.all(
+                                          color: isFocused ? bgColor : inkColor,
+                                          width: 0.8,
+                                        ),
+                                      ),
+                                      child: Text(
+                                        'FRIEND',
+                                        style: BitMechanicalTheme.statusPixel(
+                                          color: isFocused ? inkColor : inkColor,
+                                          fontSize: 7,
+                                          fontWeight: FontWeight.w900,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ],
                               ),
                             ),
 
-                            // Connect Button
+                            // Connect / Klicked Button
                             Container(
                               padding: const EdgeInsets.symmetric(
                                   horizontal: 5, vertical: 2),
-                              color: isFocused ? bgColor : inkColor,
+                              decoration: BoxDecoration(
+                                color: isAlreadyFriend
+                                    ? (isFocused ? bgColor : Colors.transparent)
+                                    : (isFocused ? bgColor : inkColor),
+                                border: isAlreadyFriend
+                                    ? Border.all(
+                                        color: isFocused ? bgColor : inkColor,
+                                        width: 1,
+                                      )
+                                    : null,
+                              ),
                               child: Text(
-                                'CONNECT',
+                                isAlreadyFriend ? 'KLICKED' : 'CONNECT',
                                 style: BitMechanicalTheme.statusPixel(
-                                  color: isFocused ? inkColor : bgColor,
+                                  color: isAlreadyFriend
+                                      ? (isFocused ? inkColor : inkColor)
+                                      : (isFocused ? inkColor : bgColor),
                                   fontWeight: FontWeight.w900,
                                 ),
                               ),

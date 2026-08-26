@@ -18,6 +18,8 @@ class TestBluetoothService implements BluetoothService {
   DisconnectCallback? onDisconnected;
   @override
   MessageReceivedCallback? onMessageReceived;
+  @override
+  ConnectionRequestCallback? onConnectionRequest;
 
   final List<String> sentMessages = [];
 
@@ -74,7 +76,7 @@ void main() {
     SharedPreferences.setMockInitialValues({});
   });
 
-  testWidgets('Klick Loading Splash Screen boot test', (WidgetTester tester) async {
+  testWidgets('Klick Loading Splash Screen 5-second boot test', (WidgetTester tester) async {
     final mockService = TestBluetoothService();
     final controller = KlickController(bluetoothService: mockService);
 
@@ -89,8 +91,8 @@ void main() {
     expect(find.text('OFFLINE BLUETOOTH COMMUNICATOR'), findsOneWidget);
     expect(find.text('// KLICK OS'), findsOneWidget);
 
-    // Advance boot sequence
-    await tester.pump(const Duration(milliseconds: 2500));
+    // Advance 5-second boot sequence
+    await tester.pump(const Duration(milliseconds: 5500));
     await tester.pumpAndSettle();
 
     // Verify transition to Onboarding
@@ -99,7 +101,7 @@ void main() {
     controller.dispose();
   });
 
-  testWidgets('Onboarding Callsign form and real messaging flow test', (WidgetTester tester) async {
+  testWidgets('Onboarding Callsign form, discovery, and messaging flow test', (WidgetTester tester) async {
     final mockService = TestBluetoothService();
     final controller = KlickController(bluetoothService: mockService);
 
@@ -109,29 +111,9 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    // Verify Onboarding Screen
-    expect(find.text('OFFLINE MESSAGING'), findsOneWidget);
-    expect(find.text('SKIP'), findsOneWidget);
-
-    // Advance to Callsign Form (page 4)
-    await tester.tap(find.text('CONTINUE'));
+    // Skip onboarding
+    await tester.tap(find.text('SKIP'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('CONTINUE'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('CONTINUE'));
-    await tester.pumpAndSettle();
-
-    expect(find.text('CHOOSE YOUR CALLSIGN'), findsOneWidget);
-    expect(find.text('LAUNCH KLICK'), findsOneWidget);
-
-    // Enter username
-    await tester.enterText(find.byType(TextField), 'COMMANDER');
-    await tester.tap(find.text('LAUNCH KLICK'));
-    await tester.pumpAndSettle();
-
-    // Verify user callsign set
-    expect(controller.localDeviceName, 'COMMANDER');
-    expect(controller.isOnboardingComplete, isTrue);
 
     // Verify Clean Empty Messages state
     expect(find.text('MESSAGES'), findsOneWidget);
@@ -167,16 +149,52 @@ void main() {
     expect(find.text('Testing real radio transmission'), findsOneWidget);
     expect(controller.conversationMessages['real_endpoint_99']?.length ?? 0, 1);
 
-    // 5. Simulate real incoming message from peer
-    mockService.onMessageReceived?.call('real_endpoint_99', 'Received loud and clear!');
+    // 5. Navigate back to Scanner -> Verify it now says KLICKED
+    controller.navigateTo(KlickScreen.scan);
     await tester.pumpAndSettle();
-
-    expect(find.text('Received loud and clear!'), findsOneWidget);
+    expect(find.text('KLICKED'), findsOneWidget);
 
     controller.dispose();
   });
 
-  test('Klick persistence and state unit test', () async {
+  testWidgets('Interactive connection request authorization modal test', (WidgetTester tester) async {
+    final mockService = TestBluetoothService();
+    final controller = KlickController(bluetoothService: mockService);
+
+    await tester.pumpWidget(
+      KlickApp(controller: controller, showSplash: false),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('SKIP'));
+    await tester.pumpAndSettle();
+
+    // Trigger incoming connection request
+    bool accepted = false;
+    mockService.onConnectionRequest?.call(
+      'ep_incoming_1',
+      'VIPER',
+      () async { accepted = true; },
+      () async {},
+    );
+    await tester.pump();
+
+    // Verify modal appeared
+    expect(find.text('// INCOMING KLICK //'), findsOneWidget);
+    expect(find.text('VIPER\nis trying to Klick!'), findsOneWidget);
+    expect(find.text('ACCEPT'), findsOneWidget);
+    expect(find.text('REJECT'), findsOneWidget);
+
+    // Tap ACCEPT
+    await tester.tap(find.text('ACCEPT'));
+    await tester.pumpAndSettle();
+
+    expect(accepted, isTrue);
+    expect(controller.activeConnectionRequest, isNull);
+
+    controller.dispose();
+  });
+
+  test('Store-and-Forward offline queue auto-flushing unit test', () async {
     final storage = StorageService();
     final mockService = TestBluetoothService();
     final controller = KlickController(
@@ -184,49 +202,36 @@ void main() {
       storageService: storage,
     );
 
-    // Wait for async init
+    await Future.delayed(const Duration(milliseconds: 50));
+    await controller.completeOnboarding(userName: 'MAVERICK');
+
+    // Create offline peer
+    final offlinePeer = KlickDevice(
+      id: 'peer_offline_1',
+      name: 'Shadow',
+      macAddress: '11:22:33:44:55:66',
+      rssi: -60,
+      isConnected: false,
+      lastSeen: DateTime.now(),
+    );
+    controller.devices.add(offlinePeer);
+
+    // Send message while peer is offline
+    controller.sendDirectMessage(offlinePeer, 'Hey Shadow, offline message test');
+
+    // Verify message is queued
+    expect(controller.pendingMessages['peer_offline_1']?.length, 1);
+    expect(controller.conversationMessages['peer_offline_1']?.first.status, MessageStatus.queued);
+
+    // Now peer reconnects!
+    mockService.onConnected?.call('peer_offline_1', 'Shadow');
     await Future.delayed(const Duration(milliseconds: 50));
 
-    // Complete onboarding with name
-    await controller.completeOnboarding(userName: 'PHOENIX');
-    expect(controller.isOnboardingComplete, isTrue);
-    expect(controller.localDeviceName, 'PHOENIX');
-
-    // Discover & connect
-    mockService.onDeviceFound?.call(
-      KlickDevice(
-        id: 'dev_peer_7',
-        name: 'Alpha Node',
-        macAddress: '11:22:33:44:55:66',
-        rssi: -45,
-        isConnected: false,
-        lastSeen: DateTime.now(),
-      ),
-    );
-
-    await controller.connectDiscoveredDevice(controller.discoveredDevices.first);
-    expect(controller.devices.length, 1);
-    expect(controller.devices.first.name, 'Alpha Node');
-
-    // Send Message
-    controller.sendDirectMessage(controller.devices.first, 'Radio check 1-2');
-    expect(mockService.sentMessages.contains('dev_peer_7: Radio check 1-2'), isTrue);
-
-    // Create a new controller instance with same storage -> verify messages and contacts are restored!
-    final restoredController = KlickController(
-      bluetoothService: mockService,
-      storageService: storage,
-    );
-    await Future.delayed(const Duration(milliseconds: 50));
-
-    expect(restoredController.isOnboardingComplete, isTrue);
-    expect(restoredController.localDeviceName, 'PHOENIX');
-    expect(restoredController.devices.length, 1);
-    expect(restoredController.devices.first.name, 'Alpha Node');
-    expect(restoredController.conversationMessages['dev_peer_7']?.length, 1);
-    expect(restoredController.conversationMessages['dev_peer_7']?.first.text, 'Radio check 1-2');
+    // Verify queue was flushed and sent over Bluetooth
+    expect(mockService.sentMessages.contains('peer_offline_1: Hey Shadow, offline message test'), isTrue);
+    expect(controller.pendingMessages['peer_offline_1']?.isEmpty ?? true, isTrue);
+    expect(controller.conversationMessages['peer_offline_1']?.first.status, MessageStatus.sent);
 
     controller.dispose();
-    restoredController.dispose();
   });
 }

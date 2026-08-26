@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart';
+
 enum DeviceType {
   klickTerminal,
   meshNode,
@@ -6,6 +8,7 @@ enum DeviceType {
 }
 
 enum MessageStatus {
+  queued,
   sending,
   sent,
   received,
@@ -145,6 +148,8 @@ class KlickMessage {
   String get statusTag {
     if (!isMe) return '[RCVD]';
     switch (status) {
+      case MessageStatus.queued:
+        return '[QUEUED]';
       case MessageStatus.sending:
         return '[TX...]';
       case MessageStatus.sent:
@@ -177,8 +182,24 @@ class KlickMessage {
       timestamp: json['timestamp'] != null
           ? DateTime.tryParse(json['timestamp'] as String) ?? DateTime.now()
           : DateTime.now(),
-      status: MessageStatus.values[(json['status'] as int? ?? 1).clamp(0, MessageStatus.values.length - 1)],
+      status: MessageStatus.values[(json['status'] as int? ?? 2).clamp(0, MessageStatus.values.length - 1)],
       isMe: json['isMe'] as bool? ?? false,
     );
   }
+}
+
+class KlickConnectionRequest {
+  final String endpointId;
+  final String endpointName;
+  final VoidCallback onAccept;
+  final VoidCallback onReject;
+  final DateTime timestamp;
+
+  const KlickConnectionRequest({
+    required this.endpointId,
+    required this.endpointName,
+    required this.onAccept,
+    required this.onReject,
+    required this.timestamp,
+  });
 }

@@ -11,6 +11,12 @@ typedef DeviceLostCallback = void Function(String endpointId);
 typedef ConnectionCallback = void Function(String endpointId, String name);
 typedef DisconnectCallback = void Function(String endpointId);
 typedef MessageReceivedCallback = void Function(String endpointId, String message);
+typedef ConnectionRequestCallback = void Function(
+  String endpointId,
+  String endpointName,
+  Future<void> Function() accept,
+  Future<void> Function() reject,
+);
 
 abstract class BluetoothService {
   Future<bool> requestPermissions();
@@ -27,6 +33,7 @@ abstract class BluetoothService {
   ConnectionCallback? onConnected;
   DisconnectCallback? onDisconnected;
   MessageReceivedCallback? onMessageReceived;
+  ConnectionRequestCallback? onConnectionRequest;
 
   void dispose();
 }
@@ -45,6 +52,8 @@ class NearbyBluetoothService implements BluetoothService {
   DisconnectCallback? onDisconnected;
   @override
   MessageReceivedCallback? onMessageReceived;
+  @override
+  ConnectionRequestCallback? onConnectionRequest;
 
   final Map<String, String> _connectedEndpoints = {};
   bool _isAdvertising = false;
@@ -65,6 +74,7 @@ class NearbyBluetoothService implements BluetoothService {
         Permission.bluetoothAdvertise,
         Permission.locationWhenInUse,
         Permission.nearbyWifiDevices,
+        Permission.notification,
       ];
 
       final statuses = await permissions.request();
@@ -72,6 +82,7 @@ class NearbyBluetoothService implements BluetoothService {
       statuses.forEach((perm, status) {
         if (perm != Permission.nearbyWifiDevices &&
             perm != Permission.bluetooth &&
+            perm != Permission.notification &&
             status == PermissionStatus.permanentlyDenied) {
           granted = false;
         }
@@ -93,21 +104,36 @@ class NearbyBluetoothService implements BluetoothService {
         localName,
         _strategy,
         onConnectionInitiated: (endpointId, connectionInfo) async {
-          debugPrint('Connection initiated from: ${connectionInfo.endpointName}');
-          await Nearby().acceptConnection(
-            endpointId,
-            onPayLoadRecieved: (epId, payload) {
-              if (payload.type == PayloadType.BYTES && payload.bytes != null) {
-                final message = utf8.decode(payload.bytes!);
-                onMessageReceived?.call(epId, message);
-              }
-            },
-          );
+          debugPrint('Connection initiated from: ${connectionInfo.endpointName} ($endpointId)');
+          _connectedEndpoints[endpointId] = connectionInfo.endpointName;
+
+          Future<void> accept() async {
+            await Nearby().acceptConnection(
+              endpointId,
+              onPayLoadRecieved: (epId, payload) {
+                if (payload.type == PayloadType.BYTES && payload.bytes != null) {
+                  final message = utf8.decode(payload.bytes!);
+                  onMessageReceived?.call(epId, message);
+                }
+              },
+            );
+          }
+
+          Future<void> reject() async {
+            await Nearby().rejectConnection(endpointId);
+            _connectedEndpoints.remove(endpointId);
+          }
+
+          if (onConnectionRequest != null) {
+            onConnectionRequest!(endpointId, connectionInfo.endpointName, accept, reject);
+          } else {
+            await accept();
+          }
         },
         onConnectionResult: (endpointId, status) {
           if (status == Status.CONNECTED) {
-            _connectedEndpoints[endpointId] = localName;
-            onConnected?.call(endpointId, localName);
+            final peerName = _connectedEndpoints[endpointId] ?? 'Nearby Contact';
+            onConnected?.call(endpointId, peerName);
           } else {
             _connectedEndpoints.remove(endpointId);
             onDisconnected?.call(endpointId);
@@ -194,6 +220,7 @@ class NearbyBluetoothService implements BluetoothService {
         localName,
         endpointId,
         onConnectionInitiated: (epId, connectionInfo) async {
+          _connectedEndpoints[epId] = connectionInfo.endpointName;
           await Nearby().acceptConnection(
             epId,
             onPayLoadRecieved: (id, payload) {
@@ -206,8 +233,8 @@ class NearbyBluetoothService implements BluetoothService {
         },
         onConnectionResult: (epId, status) {
           if (status == Status.CONNECTED) {
-            _connectedEndpoints[epId] = endpointId;
-            onConnected?.call(epId, endpointId);
+            final peerName = _connectedEndpoints[epId] ?? localName;
+            onConnected?.call(epId, peerName);
           } else {
             _connectedEndpoints.remove(epId);
             onDisconnected?.call(epId);

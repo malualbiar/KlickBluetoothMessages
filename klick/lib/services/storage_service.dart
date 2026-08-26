@@ -8,6 +8,7 @@ class StorageService {
   static const String _keyUserName = 'klick_user_name';
   static const String _keyContacts = 'klick_saved_contacts';
   static const String _keyMessages = 'klick_saved_messages';
+  static const String _keyPendingQueue = 'klick_pending_queue';
 
   SharedPreferences? _prefs;
 
@@ -101,6 +102,42 @@ class StorageService {
       await _prefs?.setString(_keyMessages, json.encode(map));
     } catch (e) {
       debugPrint('StorageService saveMessages error: $e');
+    }
+  }
+
+  // Outgoing Pending Message Queue (for offline auto-resend)
+  Future<Map<String, List<KlickMessage>>> loadPendingQueue() async {
+    try {
+      _prefs ??= await SharedPreferences.getInstance();
+      final raw = _prefs?.getString(_keyPendingQueue);
+      if (raw == null || raw.isEmpty) return {};
+
+      final decoded = json.decode(raw) as Map<String, dynamic>;
+      final Map<String, List<KlickMessage>> map = {};
+      decoded.forEach((key, val) {
+        if (val is List) {
+          map[key] = val
+              .map((item) => KlickMessage.fromJson(item as Map<String, dynamic>))
+              .toList();
+        }
+      });
+      return map;
+    } catch (e) {
+      debugPrint('StorageService loadPendingQueue error: $e');
+      return {};
+    }
+  }
+
+  Future<void> savePendingQueue(Map<String, List<KlickMessage>> pending) async {
+    try {
+      _prefs ??= await SharedPreferences.getInstance();
+      final Map<String, dynamic> map = {};
+      pending.forEach((key, list) {
+        map[key] = list.map((m) => m.toJson()).toList();
+      });
+      await _prefs?.setString(_keyPendingQueue, json.encode(map));
+    } catch (e) {
+      debugPrint('StorageService savePendingQueue error: $e');
     }
   }
 }

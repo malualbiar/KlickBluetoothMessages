@@ -42,6 +42,7 @@ class _SplashScreenState extends State<SplashScreen>
 
   void _startBootSequence() {
     int step = 0;
+    const totalSteps = 20; // 20 * 250ms = 5000ms (5.0 seconds)
     _bootTimer = Timer.periodic(const Duration(milliseconds: 250), (timer) {
       step++;
       if (!mounted) {
@@ -50,19 +51,21 @@ class _SplashScreenState extends State<SplashScreen>
       }
 
       setState(() {
-        _progress = (step / 8).clamp(0.0, 1.0);
-        if (step == 2) {
-          _statusText = 'INITIALIZING BLUETOOTH RADIO...';
-        } else if (step == 4) {
-          _statusText = 'CALIBRATING P2P PROTOCOL...';
-        } else if (step == 6) {
-          _statusText = 'AUTHENTICATING RADIO TERMINAL...';
-        } else if (step >= 8) {
+        _progress = (step / (totalSteps - 1)).clamp(0.0, 1.0);
+        if (step <= 3) {
+          _statusText = 'BOOTING KLICK HARDWARE OS...';
+        } else if (step <= 7) {
+          _statusText = 'INITIALIZING BLUETOOTH RADIO HARDWARE...';
+        } else if (step <= 12) {
+          _statusText = 'CALIBRATING P2P SPECTRUM FREQUENCY...';
+        } else if (step <= 16) {
+          _statusText = 'AUTHENTICATING NODE & LOCAL CALLSIGN...';
+        } else {
           _statusText = 'KLICK COMMUNICATOR READY';
         }
       });
 
-      if (step >= 9) {
+      if (step >= totalSteps) {
         timer.cancel();
         widget.onLoaded();
       }
