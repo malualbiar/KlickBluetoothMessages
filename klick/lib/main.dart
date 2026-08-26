@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'controllers/klick_controller.dart';
+import 'screens/onboarding_screen.dart';
 import 'theme/bit_mechanical_theme.dart';
 import 'widgets/hardware_shell.dart';
 
@@ -107,6 +108,10 @@ class _KlickMainScreenState extends State<KlickMainScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (!_controller.isOnboardingComplete) {
+      return OnboardingScreen(controller: _controller);
+    }
+
     return Scaffold(
       backgroundColor: BitMechanicalTheme.hardwareBody,
       body: SafeArea(

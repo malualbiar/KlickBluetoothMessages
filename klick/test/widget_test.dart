@@ -4,9 +4,23 @@ import 'package:klick/controllers/klick_controller.dart';
 import 'package:klick/main.dart';
 
 void main() {
-  testWidgets('Streamlined Klick Bluetooth messaging app test', (WidgetTester tester) async {
-    // 1. Launch App directly to Messages
+  testWidgets('Klick Onboarding and Bluetooth messaging flow test', (WidgetTester tester) async {
+    // 1. Launch App (starts on Onboarding Screen)
     await tester.pumpWidget(const KlickApp());
+    await tester.pumpAndSettle();
+
+    // Verify Onboarding Screen is shown
+    expect(find.text('OFFLINE MESSAGING'), findsOneWidget);
+    expect(find.text('SKIP'), findsOneWidget);
+    expect(find.text('CONTINUE'), findsOneWidget);
+
+    // 2. Advance to next onboarding slide
+    await tester.tap(find.text('CONTINUE'));
+    await tester.pumpAndSettle();
+    expect(find.text('FAST ZERO-CONFIG PAIRING'), findsOneWidget);
+
+    // 3. Skip onboarding into main screen
+    await tester.tap(find.text('SKIP'));
     await tester.pumpAndSettle();
 
     // Verify Messages Header and Contacts
@@ -14,7 +28,7 @@ void main() {
     expect(find.text('Alex (Phone)'), findsOneWidget);
     expect(find.text('Maya (Laptop)'), findsOneWidget);
 
-    // 2. Tap to open chat with Alex
+    // 4. Tap to open chat with Alex
     await tester.tap(find.text('Alex (Phone)'));
     await tester.pumpAndSettle();
 
@@ -24,7 +38,7 @@ void main() {
     expect(find.text('Type message...'), findsOneWidget);
     expect(find.text('SEND'), findsOneWidget);
 
-    // 3. Send a message using on-screen input
+    // 5. Send a message using on-screen input
     await tester.enterText(find.byType(TextField), 'Hello from Klick!');
     await tester.tap(find.text('SEND'));
     await tester.pump();
@@ -36,12 +50,12 @@ void main() {
     await tester.pump(const Duration(milliseconds: 2000));
     await tester.pumpAndSettle();
 
-    // 4. Navigate back to Messages List
+    // 6. Navigate back to Messages List
     await tester.tap(find.text('◄'));
     await tester.pumpAndSettle();
     expect(find.text('MESSAGES'), findsOneWidget);
 
-    // 5. Open Bluetooth Scanner
+    // 7. Open Bluetooth Scanner
     await tester.tap(find.text('SCAN').first);
     await tester.pumpAndSettle();
     expect(find.text('NEARBY DEVICES'), findsOneWidget);
@@ -61,6 +75,10 @@ void main() {
 
   test('KlickController direct messaging unit test', () {
     final controller = KlickController();
+
+    expect(controller.isOnboardingComplete, isFalse);
+    controller.completeOnboarding();
+    expect(controller.isOnboardingComplete, isTrue);
 
     expect(controller.currentScreen, KlickScreen.chats);
     expect(controller.devices.isNotEmpty, isTrue);

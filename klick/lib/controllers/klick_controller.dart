@@ -13,6 +13,14 @@ enum KlickScreen {
 }
 
 class KlickController extends ChangeNotifier {
+  // Onboarding
+  bool isOnboardingComplete = false;
+
+  void completeOnboarding() {
+    isOnboardingComplete = true;
+    notifyListeners();
+  }
+
   // Navigation
   KlickScreen currentScreen = KlickScreen.chats;
   final List<KlickScreen> _screenHistory = [];

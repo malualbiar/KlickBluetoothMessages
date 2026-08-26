@@ -110,11 +110,46 @@ class BitMechanicalTheme {
     );
   }
 
-  static TextStyle statusPixel({Color? color, FontWeight? fontWeight}) {
+  static TextStyle statusPixel({
+    Color? color,
+    FontWeight? fontWeight,
+    double? letterSpacing,
+    double? fontSize,
+  }) {
     return GoogleFonts.jetBrainsMono(
-      fontSize: 10,
+      fontSize: fontSize ?? 10,
       fontWeight: fontWeight ?? FontWeight.w700,
-      letterSpacing: 0.5,
+      letterSpacing: letterSpacing ?? 0.5,
+      color: color ?? const Color(0xFF111111),
+    );
+  }
+
+  static TextStyle headlineMono({
+    Color? color,
+    double fontSize = 16,
+    FontWeight? fontWeight,
+    double? letterSpacing,
+  }) {
+    return GoogleFonts.spaceMono(
+      fontSize: fontSize,
+      fontWeight: fontWeight ?? FontWeight.w700,
+      letterSpacing: letterSpacing ?? 0,
+      color: color ?? const Color(0xFF111111),
+    );
+  }
+
+  static TextStyle bodyMono({
+    Color? color,
+    double fontSize = 12,
+    FontWeight? fontWeight,
+    double? height,
+    double? letterSpacing,
+  }) {
+    return GoogleFonts.jetBrainsMono(
+      fontSize: fontSize,
+      fontWeight: fontWeight ?? FontWeight.w500,
+      letterSpacing: letterSpacing ?? 0,
+      height: height,
       color: color ?? const Color(0xFF111111),
     );
   }
