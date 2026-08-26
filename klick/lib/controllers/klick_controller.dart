@@ -157,16 +157,26 @@ class KlickController extends ChangeNotifier {
         onAccept: () async {
           await accept();
           activeConnectionRequest = null;
+          _notificationService.dismissKlickRequestNotification(endpointId);
           notifyListeners();
         },
         onReject: () async {
           await reject();
           activeConnectionRequest = null;
+          _notificationService.dismissKlickRequestNotification(endpointId);
           notifyListeners();
         },
         timestamp: DateTime.now(),
       );
+
       HapticFeedback.heavyImpact();
+
+      // Fire system pop notification so user is alerted even with screen off
+      _notificationService.showKlickRequestNotification(
+        requesterName: displayName,
+        endpointId: endpointId,
+      );
+
       notifyListeners();
     };
 
@@ -321,9 +331,9 @@ class KlickController extends ChangeNotifier {
 
       showInAppToast('// NEW KLICK // $senderName: $text');
       _notificationService.showMessageNotification(
-        title: 'Klick from $senderName',
-        body: text,
-        payload: endpointId,
+        senderName: senderName,
+        messageBody: text,
+        endpointId: endpointId,
       );
     }
 

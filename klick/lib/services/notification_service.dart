@@ -1,4 +1,4 @@
-import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
 class NotificationService {
@@ -10,6 +10,10 @@ class NotificationService {
       FlutterLocalNotificationsPlugin();
 
   bool _isInitialized = false;
+
+  // Channel IDs
+  static const String _messageChannelId = 'klick_messages';
+  static const String _klickRequestChannelId = 'klick_requests';
 
   Future<void> init() async {
     if (_isInitialized) return;
@@ -31,92 +35,165 @@ class NotificationService {
       await _notificationsPlugin.initialize(
         initSettings,
         onDidReceiveNotificationResponse: (response) {
-          debugPrint('Notification clicked with payload: ${response.payload}');
+          debugPrint('Notification tapped: ${response.payload}');
         },
       );
 
-      // Create Android Notification Channel
-      final androidPlatformChannelSpecifics =
+      final androidPlugin =
           _notificationsPlugin.resolvePlatformSpecificImplementation<
               AndroidFlutterLocalNotificationsPlugin>();
 
-      await androidPlatformChannelSpecifics?.createNotificationChannel(
-        const AndroidNotificationChannel(
-          'klick_radio_messages',
+      // Channel 1: Incoming messages — high importance, sound, vibrate
+      await androidPlugin?.createNotificationChannel(
+        AndroidNotificationChannel(
+          _messageChannelId,
           'Klick Messages',
-          description: 'Notifications for incoming offline Bluetooth messages',
+          description: 'Notifications for incoming Bluetooth messages',
           importance: Importance.max,
+          playSound: true,
           enableVibration: true,
+          enableLights: true,
+          ledColor: const Color(0xFFFFB300),
         ),
       );
 
+      // Channel 2: Klick connection requests — max importance, interrupting
+      await androidPlugin?.createNotificationChannel(
+        AndroidNotificationChannel(
+          _klickRequestChannelId,
+          'Klick Requests',
+          description: 'Notifications when someone wants to connect with you',
+          importance: Importance.max,
+          playSound: true,
+          enableVibration: true,
+          enableLights: true,
+          ledColor: const Color(0xFFFFB300),
+        ),
+      );
+
+      // Request notification permission on Android 13+
+      await androidPlugin?.requestNotificationsPermission();
+
       _isInitialized = true;
+      debugPrint('NotificationService initialized successfully');
     } catch (e) {
       debugPrint('NotificationService init error: $e');
     }
   }
 
-  Future<void> requestPermissions() async {
-    try {
-      final androidImplementation =
-          _notificationsPlugin.resolvePlatformSpecificImplementation<
-              AndroidFlutterLocalNotificationsPlugin>();
-      await androidImplementation?.requestNotificationsPermission();
-
-      final iosImplementation =
-          _notificationsPlugin.resolvePlatformSpecificImplementation<
-              IOSFlutterLocalNotificationsPlugin>();
-      await iosImplementation?.requestPermissions(
-        alert: true,
-        badge: true,
-        sound: true,
-      );
-    } catch (e) {
-      debugPrint('NotificationService permission error: $e');
-    }
-  }
-
+  /// Show notification for incoming message — fires even with screen off
   Future<void> showMessageNotification({
-    required String title,
-    required String body,
-    String? payload,
+    required String senderName,
+    required String messageBody,
+    String? endpointId,
   }) async {
-    if (!_isInitialized) {
-      await init();
-    }
+    if (!_isInitialized) await init();
 
-    const androidDetails = AndroidNotificationDetails(
-      'klick_radio_messages',
+    final androidDetails = AndroidNotificationDetails(
+      _messageChannelId,
       'Klick Messages',
-      channelDescription: 'Notifications for incoming offline Bluetooth messages',
+      channelDescription: 'Notifications for incoming Bluetooth messages',
       importance: Importance.max,
       priority: Priority.high,
-      showWhen: true,
+      fullScreenIntent: true,       // wakes screen even when off
+      playSound: true,
       enableVibration: true,
+      ticker: 'New Klick message',
+      showWhen: true,
+      styleInformation: BigTextStyleInformation(
+        messageBody,
+        contentTitle: '📡 Klick from $senderName',
+        summaryText: 'Klick Messenger',
+      ),
     );
 
     const iosDetails = DarwinNotificationDetails(
       presentAlert: true,
       presentBadge: true,
       presentSound: true,
+      interruptionLevel: InterruptionLevel.timeSensitive,
     );
 
-    const details = NotificationDetails(
+    final details = NotificationDetails(
       android: androidDetails,
       iOS: iosDetails,
     );
 
     try {
-      final id = DateTime.now().millisecondsSinceEpoch ~/ 1000;
       await _notificationsPlugin.show(
-        id,
-        title,
-        body,
+        _stableId(endpointId ?? senderName),
+        '📡 Klick from $senderName',
+        messageBody,
         details,
-        payload: payload,
+        payload: endpointId,
       );
     } catch (e) {
-      debugPrint('Error showing notification: $e');
+      debugPrint('Error showing message notification: $e');
     }
   }
+
+  /// Show notification for incoming Klick connection request — interrupts immediately
+  Future<void> showKlickRequestNotification({
+    required String requesterName,
+    String? endpointId,
+  }) async {
+    if (!_isInitialized) await init();
+
+    final androidDetails = AndroidNotificationDetails(
+      _klickRequestChannelId,
+      'Klick Requests',
+      channelDescription: 'Notifications when someone wants to connect with you',
+      importance: Importance.max,
+      priority: Priority.max,
+      fullScreenIntent: true,       // wakes screen even when off
+      playSound: true,
+      enableVibration: true,
+      ticker: 'Incoming Klick request',
+      showWhen: true,
+      autoCancel: true,
+      styleInformation: BigTextStyleInformation(
+        '$requesterName wants to Klick! Open the app to Accept or Reject.',
+        contentTitle: '⚡ Incoming Klick!',
+        summaryText: 'Klick Messenger',
+      ),
+    );
+
+    const iosDetails = DarwinNotificationDetails(
+      presentAlert: true,
+      presentBadge: true,
+      presentSound: true,
+      interruptionLevel: InterruptionLevel.timeSensitive,
+    );
+
+    final details = NotificationDetails(
+      android: androidDetails,
+      iOS: iosDetails,
+    );
+
+    try {
+      await _notificationsPlugin.show(
+        _stableId('request_${endpointId ?? requesterName}'),
+        '⚡ Incoming Klick!',
+        '$requesterName wants to Klick!',
+        details,
+        payload: endpointId,
+      );
+    } catch (e) {
+      debugPrint('Error showing Klick request notification: $e');
+    }
+  }
+
+  /// Dismiss any existing Klick request notification once handled
+  Future<void> dismissKlickRequestNotification(String endpointId) async {
+    try {
+      await _notificationsPlugin.cancel(
+        _stableId('request_$endpointId'),
+      );
+    } catch (e) {
+      debugPrint('Error dismissing notification: $e');
+    }
+  }
+
+  /// Stable integer ID from a string key (avoids duplicates per-peer)
+  int _stableId(String key) => key.hashCode.abs() % 100000;
 }
