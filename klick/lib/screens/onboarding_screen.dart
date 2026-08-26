@@ -103,18 +103,27 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         // Brand Title with Bit-Mechanical styling
         Row(
           children: [
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-              decoration: BoxDecoration(
-                color: BitMechanicalTheme.primaryAmber,
-                borderRadius: BorderRadius.circular(3),
-              ),
-              child: Text(
-                'K',
-                style: BitMechanicalTheme.headlineMono(
-                  color: const Color(0xFF111111),
-                  fontSize: 13,
-                  fontWeight: FontWeight.w900,
+            ClipRRect(
+              borderRadius: BorderRadius.circular(4),
+              child: Image.asset(
+                'lib/assets/icons/KlickICON.jpg',
+                width: 22,
+                height: 22,
+                fit: BoxFit.cover,
+                errorBuilder: (context, error, stackTrace) => Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: BitMechanicalTheme.primaryAmber,
+                    borderRadius: BorderRadius.circular(3),
+                  ),
+                  child: Text(
+                    'K',
+                    style: BitMechanicalTheme.headlineMono(
+                      color: const Color(0xFF111111),
+                      fontSize: 13,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
                 ),
               ),
             ),
