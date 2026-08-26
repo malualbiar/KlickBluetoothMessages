@@ -15,6 +15,9 @@ class HardwareShell extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final bottomInset = MediaQuery.of(context).viewInsets.bottom;
+    final isKeyboardOpen = bottomInset > 0;
+
     return Container(
       width: double.infinity,
       height: double.infinity,
@@ -32,20 +35,37 @@ class HardwareShell extends StatelessWidget {
             child: _buildDisplayArea(),
           ),
 
-          const SizedBox(height: 8),
+          // Hardware Controls Area (D-Pad + QWERTY) with animated slide-under transition
+          AnimatedSize(
+            duration: const Duration(milliseconds: 260),
+            curve: Curves.easeInOutCubic,
+            child: isKeyboardOpen
+                ? const SizedBox.shrink()
+                : AnimatedSlide(
+                    offset: isKeyboardOpen ? const Offset(0, 1.0) : Offset.zero,
+                    duration: const Duration(milliseconds: 260),
+                    curve: Curves.easeInOutCubic,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const SizedBox(height: 8),
 
-          // Hardware Controls Area (D-Pad + QWERTY)
-          DpadControl(controller: controller),
+                        // Hardware Controls Area (D-Pad)
+                        DpadControl(controller: controller),
 
-          const SizedBox(height: 8),
+                        const SizedBox(height: 8),
 
-          // QWERTY Tactile Keyboard
-          QwertyKeyboard(controller: controller),
+                        // QWERTY Tactile Keyboard
+                        QwertyKeyboard(controller: controller),
 
-          const SizedBox(height: 4),
+                        const SizedBox(height: 4),
 
-          // Microphone Pin Hole
-          _buildMicrophoneHole(),
+                        // Microphone Pin Hole
+                        _buildMicrophoneHole(),
+                      ],
+                    ),
+                  ),
+          ),
         ],
       ),
     );
@@ -149,19 +169,11 @@ class HardwareShell extends StatelessWidget {
 
   Widget _buildMicrophoneHole() {
     return Container(
-      width: 3.5,
-      height: 3.5,
-      margin: const EdgeInsets.only(top: 2, bottom: 2),
+      width: 4,
+      height: 4,
       decoration: const BoxDecoration(
         color: Color(0xFF0A0A0A),
         shape: BoxShape.circle,
-        boxShadow: [
-          BoxShadow(
-            color: Color(0x33FFFFFF),
-            offset: Offset(0, 0.5),
-            blurRadius: 0.5,
-          ),
-        ],
       ),
     );
   }

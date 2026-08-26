@@ -4,6 +4,8 @@ import 'package:klick/controllers/klick_controller.dart';
 import 'package:klick/main.dart';
 import 'package:klick/models/bluetooth_device.dart';
 import 'package:klick/services/bluetooth_service.dart';
+import 'package:klick/services/storage_service.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class TestBluetoothService implements BluetoothService {
   @override
@@ -48,7 +50,8 @@ class TestBluetoothService implements BluetoothService {
 
   @override
   Future<void> connect(String endpointId, String localName) async {
-    onConnected?.call(endpointId, 'Pixel 9 Pro');
+    final name = endpointId == 'dev_peer_7' ? 'Alpha Node' : 'Pixel 9 Pro';
+    onConnected?.call(endpointId, name);
   }
 
   @override
@@ -67,6 +70,10 @@ class TestBluetoothService implements BluetoothService {
 }
 
 void main() {
+  setUp(() {
+    SharedPreferences.setMockInitialValues({});
+  });
+
   testWidgets('Klick Loading Splash Screen boot test', (WidgetTester tester) async {
     final mockService = TestBluetoothService();
     final controller = KlickController(bluetoothService: mockService);
@@ -92,7 +99,7 @@ void main() {
     controller.dispose();
   });
 
-  testWidgets('Real Bluetooth device search and messaging flow test', (WidgetTester tester) async {
+  testWidgets('Onboarding Callsign form and real messaging flow test', (WidgetTester tester) async {
     final mockService = TestBluetoothService();
     final controller = KlickController(bluetoothService: mockService);
 
@@ -106,11 +113,27 @@ void main() {
     expect(find.text('OFFLINE MESSAGING'), findsOneWidget);
     expect(find.text('SKIP'), findsOneWidget);
 
-    // Skip onboarding
-    await tester.tap(find.text('SKIP'));
+    // Advance to Callsign Form (page 4)
+    await tester.tap(find.text('CONTINUE'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('CONTINUE'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('CONTINUE'));
     await tester.pumpAndSettle();
 
-    // Verify Clean Empty Messages state (no dummy contacts)
+    expect(find.text('CHOOSE YOUR CALLSIGN'), findsOneWidget);
+    expect(find.text('LAUNCH KLICK'), findsOneWidget);
+
+    // Enter username
+    await tester.enterText(find.byType(TextField), 'COMMANDER');
+    await tester.tap(find.text('LAUNCH KLICK'));
+    await tester.pumpAndSettle();
+
+    // Verify user callsign set
+    expect(controller.localDeviceName, 'COMMANDER');
+    expect(controller.isOnboardingComplete, isTrue);
+
+    // Verify Clean Empty Messages state
     expect(find.text('MESSAGES'), findsOneWidget);
     expect(find.text('NO BLUETOOTH CONTACTS'), findsOneWidget);
     expect(find.text('SCAN FOR RADIOS'), findsOneWidget);
@@ -130,9 +153,9 @@ void main() {
     await tester.tap(find.text('CONNECT'));
     await tester.pumpAndSettle();
 
-    // Verify Chat Screen opens
+    // Verify Chat Screen opens and shows ONLINE presence
     expect(find.text('Pixel 9 Pro'), findsWidgets);
-    expect(find.text('Connected'), findsOneWidget);
+    expect(find.text('ONLINE'), findsOneWidget);
     expect(find.text('Type message...'), findsOneWidget);
 
     // 4. Send a real Bluetooth text message
@@ -150,42 +173,60 @@ void main() {
 
     expect(find.text('Received loud and clear!'), findsOneWidget);
 
-    // Clean up controller timers
     controller.dispose();
   });
 
-  test('KlickController unit test with real clean state', () async {
+  test('Klick persistence and state unit test', () async {
+    final storage = StorageService();
     final mockService = TestBluetoothService();
-    final controller = KlickController(bluetoothService: mockService);
+    final controller = KlickController(
+      bluetoothService: mockService,
+      storageService: storage,
+    );
 
-    // Starts completely empty (no dummy devices)
-    expect(controller.devices.isEmpty, isTrue);
-    expect(controller.discoveredDevices.isEmpty, isTrue);
-    expect(controller.conversationMessages.isEmpty, isTrue);
+    // Wait for async init
+    await Future.delayed(const Duration(milliseconds: 50));
 
-    // Discover real device
+    // Complete onboarding with name
+    await controller.completeOnboarding(userName: 'PHOENIX');
+    expect(controller.isOnboardingComplete, isTrue);
+    expect(controller.localDeviceName, 'PHOENIX');
+
+    // Discover & connect
     mockService.onDeviceFound?.call(
       KlickDevice(
-        id: 'dev_real_1',
-        name: 'Galaxy S24',
+        id: 'dev_peer_7',
+        name: 'Alpha Node',
         macAddress: '11:22:33:44:55:66',
-        rssi: -50,
+        rssi: -45,
         isConnected: false,
         lastSeen: DateTime.now(),
       ),
     );
 
-    expect(controller.discoveredDevices.length, 1);
-    expect(controller.discoveredDevices.first.name, 'Galaxy S24');
-
-    // Connect
     await controller.connectDiscoveredDevice(controller.discoveredDevices.first);
     expect(controller.devices.length, 1);
+    expect(controller.devices.first.name, 'Alpha Node');
 
     // Send Message
-    controller.sendDirectMessage(controller.devices.first, 'Hello over Bluetooth');
-    expect(mockService.sentMessages.contains('dev_real_1: Hello over Bluetooth'), isTrue);
+    controller.sendDirectMessage(controller.devices.first, 'Radio check 1-2');
+    expect(mockService.sentMessages.contains('dev_peer_7: Radio check 1-2'), isTrue);
+
+    // Create a new controller instance with same storage -> verify messages and contacts are restored!
+    final restoredController = KlickController(
+      bluetoothService: mockService,
+      storageService: storage,
+    );
+    await Future.delayed(const Duration(milliseconds: 50));
+
+    expect(restoredController.isOnboardingComplete, isTrue);
+    expect(restoredController.localDeviceName, 'PHOENIX');
+    expect(restoredController.devices.length, 1);
+    expect(restoredController.devices.first.name, 'Alpha Node');
+    expect(restoredController.conversationMessages['dev_peer_7']?.length, 1);
+    expect(restoredController.conversationMessages['dev_peer_7']?.first.text, 'Radio check 1-2');
 
     controller.dispose();
+    restoredController.dispose();
   });
 }

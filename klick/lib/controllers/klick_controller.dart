@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../models/bluetooth_device.dart';
 import '../services/bluetooth_service.dart';
+import '../services/storage_service.dart';
 import '../theme/bit_mechanical_theme.dart';
 
 enum KlickScreen {
@@ -13,11 +14,25 @@ enum KlickScreen {
 }
 
 class KlickController extends ChangeNotifier {
+  // Persistence
+  final StorageService _storageService;
+  bool isInitialized = false;
+
   // Onboarding
   bool isOnboardingComplete = false;
 
-  void completeOnboarding() {
+  Future<void> completeOnboarding({String? userName}) async {
+    if (userName != null && userName.trim().isNotEmpty) {
+      localDeviceName = userName.trim().toUpperCase();
+      await _storageService.setUserName(localDeviceName);
+    }
     isOnboardingComplete = true;
+    await _storageService.setOnboardingComplete(true);
+
+    // Restart advertising with verified identity
+    await _bluetoothService.stopAdvertising();
+    await _bluetoothService.startAdvertising(localDeviceName);
+
     notifyListeners();
   }
 
@@ -29,7 +44,7 @@ class KlickController extends ChangeNotifier {
   LcdThemeMode lcdTheme = LcdThemeMode.amberGold;
 
   // Local Device Identity
-  late final String localDeviceName;
+  String localDeviceName = 'KLICK-USER';
 
   // Active Key Pressed (for tactile hardware visual state)
   String? activeHardwareKey;
@@ -41,7 +56,7 @@ class KlickController extends ChangeNotifier {
   // Text Input buffer (for QWERTY input / composer)
   final TextEditingController textInputController = TextEditingController();
 
-  // Devices & Conversations (Real physical devices only)
+  // Devices & Conversations (Real physical devices + persisted history)
   List<KlickDevice> devices = [];
   Map<String, List<KlickMessage>> conversationMessages = {};
   KlickDevice? activeChatDevice;
@@ -58,12 +73,37 @@ class KlickController extends ChangeNotifier {
   String currentTimeString = '11:57';
   Timer? _clockTimer;
 
-  KlickController({BluetoothService? bluetoothService})
-      : _bluetoothService = bluetoothService ?? NearbyBluetoothService() {
-    localDeviceName = 'KLICK-${Random().nextInt(9000) + 1000}';
-    _initBluetoothListeners();
+  KlickController({
+    BluetoothService? bluetoothService,
+    StorageService? storageService,
+  })  : _bluetoothService = bluetoothService ?? NearbyBluetoothService(),
+        _storageService = storageService ?? StorageService() {
+    _initAsync();
     _startClockTimer();
-    _initRadio();
+  }
+
+  Future<void> _initAsync() async {
+    await _storageService.init();
+    isOnboardingComplete = await _storageService.isOnboardingComplete();
+    
+    final savedName = await _storageService.getUserName();
+    if (savedName != null && savedName.isNotEmpty) {
+      localDeviceName = savedName;
+    } else {
+      localDeviceName = 'KLICK-${Random().nextInt(9000) + 1000}';
+    }
+
+    // Load persisted contacts and messages
+    final loadedContacts = await _storageService.loadContacts();
+    // Mark loaded contacts as offline until connection is established
+    devices = loadedContacts.map((d) => d.copyWith(isConnected: false)).toList();
+    conversationMessages = await _storageService.loadMessages();
+
+    _initBluetoothListeners();
+    await _initRadio();
+
+    isInitialized = true;
+    notifyListeners();
   }
 
   void _initBluetoothListeners() {
@@ -72,10 +112,21 @@ class KlickController extends ChangeNotifier {
         discoveredDevices.add(device);
         notifyListeners();
       }
+
+      // Auto-reconnect to known paired peers in background
+      final isKnown = devices.any((d) => d.id == device.id || d.macAddress == device.macAddress);
+      if (isKnown && !device.isConnected) {
+        debugPrint('Auto-reconnecting to known peer: ${device.name} (${device.id})');
+        _bluetoothService.connect(device.id, localDeviceName);
+      }
     };
 
     _bluetoothService.onDeviceLost = (endpointId) {
       discoveredDevices.removeWhere((d) => d.id == endpointId);
+      final index = devices.indexWhere((d) => d.id == endpointId);
+      if (index != -1) {
+        devices[index] = devices[index].copyWith(isConnected: false);
+      }
       notifyListeners();
     };
 
@@ -83,7 +134,11 @@ class KlickController extends ChangeNotifier {
       final index = devices.indexWhere((d) => d.id == endpointId);
       final devName = name.isNotEmpty ? name : 'Nearby Contact';
       if (index != -1) {
-        devices[index] = devices[index].copyWith(isConnected: true, name: devName);
+        devices[index] = devices[index].copyWith(
+          isConnected: true,
+          name: devName,
+          lastSeen: DateTime.now(),
+        );
       } else {
         final newDev = KlickDevice(
           id: endpointId,
@@ -97,15 +152,30 @@ class KlickController extends ChangeNotifier {
         devices.insert(0, newDev);
         conversationMessages[endpointId] ??= [];
       }
+
+      if (activeChatDevice?.id == endpointId) {
+        activeChatDevice = activeChatDevice?.copyWith(isConnected: true, lastSeen: DateTime.now());
+      }
+
+      _storageService.saveContacts(devices);
       notifyListeners();
     };
 
     _bluetoothService.onDisconnected = (endpointId) {
       final index = devices.indexWhere((d) => d.id == endpointId);
       if (index != -1) {
-        devices[index] = devices[index].copyWith(isConnected: false);
-        notifyListeners();
+        devices[index] = devices[index].copyWith(
+          isConnected: false,
+          lastSeen: DateTime.now(),
+        );
       }
+
+      if (activeChatDevice?.id == endpointId) {
+        activeChatDevice = activeChatDevice?.copyWith(isConnected: false, lastSeen: DateTime.now());
+      }
+
+      _storageService.saveContacts(devices);
+      notifyListeners();
     };
 
     _bluetoothService.onMessageReceived = (endpointId, message) {
@@ -133,6 +203,9 @@ class KlickController extends ChangeNotifier {
         lastSeen: DateTime.now(),
       );
       devices.insert(0, newDev);
+    } else {
+      final idx = devices.indexWhere((d) => d.id == endpointId);
+      devices[idx] = devices[idx].copyWith(isConnected: true, lastSeen: DateTime.now());
     }
 
     final msg = KlickMessage(
@@ -159,6 +232,10 @@ class KlickController extends ChangeNotifier {
         );
       }
     }
+
+    // Persist messages and contacts
+    _storageService.saveMessages(conversationMessages);
+    _storageService.saveContacts(devices);
 
     notifyListeners();
   }
@@ -210,6 +287,7 @@ class KlickController extends ChangeNotifier {
     final idx = devices.indexWhere((d) => d.id == device.id);
     if (idx != -1) {
       devices[idx] = devices[idx].copyWith(unreadCount: 0);
+      _storageService.saveContacts(devices);
     }
     navigateTo(KlickScreen.conversation);
   }
@@ -341,6 +419,11 @@ class KlickController extends ChangeNotifier {
     final list = List<KlickMessage>.from(conversationMessages[device.id] ?? []);
     list.add(userMsg);
     conversationMessages[device.id] = list;
+
+    // Persist messages and contacts
+    _storageService.saveMessages(conversationMessages);
+    _storageService.saveContacts(devices);
+
     notifyListeners();
 
     // Send real Bluetooth payload to physical device
@@ -381,13 +464,15 @@ class KlickController extends ChangeNotifier {
     await _bluetoothService.connect(device.id, localDeviceName);
 
     if (!devices.any((d) => d.id == device.id)) {
-      final paired = device.copyWith(isConnected: true);
+      final paired = device.copyWith(isConnected: true, lastSeen: DateTime.now());
       devices.insert(0, paired);
       conversationMessages[paired.id] ??= [];
+      _storageService.saveContacts(devices);
+      _storageService.saveMessages(conversationMessages);
       openChat(paired);
     } else {
       final existing = devices.firstWhere((d) => d.id == device.id);
-      openChat(existing);
+      openChat(existing.copyWith(isConnected: true, lastSeen: DateTime.now()));
     }
   }
 

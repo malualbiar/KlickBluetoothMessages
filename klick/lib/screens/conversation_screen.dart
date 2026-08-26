@@ -120,19 +120,22 @@ class _ConversationScreenState extends State<ConversationScreen> {
               Row(
                 children: [
                   Container(
-                    width: 5,
-                    height: 5,
+                    width: 6,
+                    height: 6,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       color: widget.device.isConnected ? inkColor : Colors.transparent,
-                      border: Border.all(color: inkColor, width: 1),
+                      border: Border.all(color: inkColor, width: 1.2),
                     ),
                   ),
-                  const SizedBox(width: 3),
+                  const SizedBox(width: 4),
                   Text(
-                    widget.device.isConnected ? 'Connected' : 'Offline',
+                    widget.device.isConnected ? 'ONLINE' : 'OFFLINE',
                     style: BitMechanicalTheme.statusPixel(
-                      color: inkColor.withValues(alpha: 0.8),
+                      color: widget.device.isConnected
+                          ? inkColor
+                          : inkColor.withValues(alpha: 0.6),
+                      fontWeight: FontWeight.w800,
                     ),
                   ),
                 ],

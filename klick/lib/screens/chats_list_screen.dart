@@ -193,13 +193,48 @@ class ChatsListScreen extends StatelessWidget {
                                   ),
                                 ),
                                 Expanded(
-                                  child: Text(
-                                    device.name,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: BitMechanicalTheme.bodyLg(
-                                      color: isFocused ? bgColor : inkColor,
-                                      fontWeight: FontWeight.w800,
-                                    ),
+                                  child: Row(
+                                    children: [
+                                      Flexible(
+                                        child: Text(
+                                          device.name,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: BitMechanicalTheme.bodyLg(
+                                            color: isFocused ? bgColor : inkColor,
+                                            fontWeight: FontWeight.w800,
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 5),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(
+                                            horizontal: 3, vertical: 1),
+                                        decoration: BoxDecoration(
+                                          color: device.isConnected
+                                              ? (isFocused ? bgColor : inkColor)
+                                              : Colors.transparent,
+                                          borderRadius: BorderRadius.circular(2),
+                                          border: Border.all(
+                                            color: isFocused
+                                                ? bgColor
+                                                : inkColor.withValues(alpha: 0.5),
+                                            width: 0.8,
+                                          ),
+                                        ),
+                                        child: Text(
+                                          device.isConnected ? 'ONLINE' : 'OFFLINE',
+                                          style: BitMechanicalTheme.statusPixel(
+                                            color: device.isConnected
+                                                ? (isFocused ? inkColor : bgColor)
+                                                : (isFocused
+                                                    ? bgColor.withValues(alpha: 0.7)
+                                                    : inkColor.withValues(alpha: 0.7)),
+                                            fontSize: 7.5,
+                                            fontWeight: FontWeight.w900,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                 ),
                                 if (lastMessage != null)

@@ -15,6 +15,7 @@ class OnboardingScreen extends StatefulWidget {
 
 class _OnboardingScreenState extends State<OnboardingScreen> {
   final PageController _pageController = PageController();
+  final TextEditingController _nameController = TextEditingController();
   int _currentPage = 0;
 
   final List<_OnboardingItem> _pages = const [
@@ -41,22 +42,30 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   @override
   void dispose() {
     _pageController.dispose();
+    _nameController.dispose();
     super.dispose();
   }
 
   void _onNext() {
-    if (_currentPage < _pages.length - 1) {
+    if (_currentPage < _pages.length) {
       _pageController.nextPage(
         duration: const Duration(milliseconds: 350),
         curve: Curves.easeInOut,
       );
     } else {
-      widget.controller.completeOnboarding();
+      _finishOnboarding();
     }
+  }
+
+  void _finishOnboarding() {
+    final name = _nameController.text.trim();
+    widget.controller.completeOnboarding(userName: name.isNotEmpty ? name : null);
   }
 
   @override
   Widget build(BuildContext context) {
+    final totalPages = _pages.length + 1; // 3 info pages + 1 callsign form page
+
     return Scaffold(
       backgroundColor: BitMechanicalTheme.hardwareBody,
       body: SafeArea(
@@ -65,28 +74,32 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           child: Column(
             children: [
               // Top Bar: Brand Logo & Skip Button
-              _buildTopBar(),
+              _buildTopBar(totalPages),
 
               const SizedBox(height: 12),
 
-              // Middle: PageView with Illustrations and Content
+              // Middle: PageView with Illustrations and Username Form
               Expanded(
                 child: PageView.builder(
                   controller: _pageController,
-                  itemCount: _pages.length,
+                  itemCount: totalPages,
                   onPageChanged: (index) {
                     setState(() => _currentPage = index);
                   },
                   itemBuilder: (context, index) {
-                    return _buildPageContent(_pages[index]);
+                    if (index < _pages.length) {
+                      return _buildPageContent(_pages[index]);
+                    } else {
+                      return _buildUsernameFormPage();
+                    }
                   },
                 ),
               ),
 
               const SizedBox(height: 16),
 
-              // Bottom Section: Progress Indicators + Next / Get Started Button
-              _buildBottomControls(),
+              // Bottom Section: Progress Indicators + Action Button
+              _buildBottomControls(totalPages),
             ],
           ),
         ),
@@ -94,7 +107,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     );
   }
 
-  Widget _buildTopBar() {
+  Widget _buildTopBar(int totalPages) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
@@ -141,9 +154,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         ),
 
         // Skip Button
-        if (_currentPage < _pages.length - 1)
+        if (_currentPage < totalPages - 1)
           GestureDetector(
-            onTap: widget.controller.completeOnboarding,
+            onTap: _finishOnboarding,
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
               decoration: BoxDecoration(
@@ -269,8 +282,171 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     );
   }
 
-  Widget _buildBottomControls() {
-    final isLastPage = _currentPage == _pages.length - 1;
+  Widget _buildUsernameFormPage() {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return SingleChildScrollView(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(minHeight: constraints.maxHeight),
+            child: IntrinsicHeight(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  // Hardware Terminal Icon
+                  Container(
+                    width: 100,
+                    height: 100,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF181818),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                        color: BitMechanicalTheme.primaryAmber,
+                        width: 2,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: BitMechanicalTheme.primaryAmber.withValues(alpha: 0.25),
+                          blurRadius: 18,
+                          spreadRadius: 1,
+                        ),
+                      ],
+                    ),
+                    padding: const EdgeInsets.all(12),
+                    child: Image.asset(
+                      'assets/icons/KlickIcon.jpg',
+                      fit: BoxFit.contain,
+                      errorBuilder: (context, error, stackTrace) => const Icon(
+                        Icons.person_pin,
+                        color: BitMechanicalTheme.primaryAmber,
+                        size: 40,
+                      ),
+                    ),
+                  ),
+
+                  const SizedBox(height: 24),
+
+                  // Step Badge
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 3,
+                    ),
+                    decoration: BoxDecoration(
+                      color: BitMechanicalTheme.surfaceContainerHigh,
+                      borderRadius: BorderRadius.circular(4),
+                      border: Border.all(
+                        color: BitMechanicalTheme.primaryAmber.withValues(
+                          alpha: 0.4,
+                        ),
+                        width: 1,
+                      ),
+                    ),
+                    child: Text(
+                      '// 04 // CALLSIGN',
+                      style: BitMechanicalTheme.statusPixel(
+                        color: BitMechanicalTheme.primaryAmber,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 0.8,
+                      ),
+                    ),
+                  ),
+
+                  const SizedBox(height: 12),
+
+                  Text(
+                    'CHOOSE YOUR CALLSIGN',
+                    textAlign: TextAlign.center,
+                    style: BitMechanicalTheme.headlineMono(
+                      color: const Color(0xFFF5F5F5),
+                      fontSize: 18,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+
+                  const SizedBox(height: 8),
+
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: Text(
+                      'Enter your radio name. Nearby devices will see this name during Bluetooth discovery.',
+                      textAlign: TextAlign.center,
+                      style: BitMechanicalTheme.bodyMono(
+                        color: const Color(0xFFAAAAAA),
+                        fontSize: 12,
+                        height: 1.4,
+                      ),
+                    ),
+                  ),
+
+                  const SizedBox(height: 24),
+
+                  // Callsign input field
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF161616),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: BitMechanicalTheme.primaryAmber,
+                          width: 1.5,
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: BitMechanicalTheme.primaryAmber.withValues(alpha: 0.15),
+                            blurRadius: 10,
+                          ),
+                        ],
+                      ),
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+                      child: Row(
+                        children: [
+                          Text(
+                            '> ',
+                            style: BitMechanicalTheme.headlineMono(
+                              color: BitMechanicalTheme.primaryAmber,
+                              fontSize: 16,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                          Expanded(
+                            child: TextField(
+                              controller: _nameController,
+                              style: BitMechanicalTheme.headlineMono(
+                                color: const Color(0xFFF5F5F5),
+                                fontSize: 15,
+                                fontWeight: FontWeight.w700,
+                                letterSpacing: 1.0,
+                              ),
+                              textCapitalization: TextCapitalization.characters,
+                              decoration: InputDecoration(
+                                hintText: 'E.G. MAVERICK, NOVA',
+                                hintStyle: BitMechanicalTheme.headlineMono(
+                                  color: BitMechanicalTheme.outlineVariant,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                                border: InputBorder.none,
+                                isDense: true,
+                              ),
+                              onSubmitted: (_) => _finishOnboarding(),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildBottomControls(int totalPages) {
+    final isLastPage = _currentPage == totalPages - 1;
 
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -278,7 +454,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         // Segmented Page Indicators
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
-          children: List.generate(_pages.length, (index) {
+          children: List.generate(totalPages, (index) {
             final isActive = index == _currentPage;
             return AnimatedContainer(
               duration: const Duration(milliseconds: 250),
@@ -292,8 +468,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 borderRadius: BorderRadius.circular(3),
                 border: Border.all(
                   color: isActive
-                      ? BitMechanicalTheme.primaryAmber
-                      : BitMechanicalTheme.outlineVariant,
+                    ? BitMechanicalTheme.primaryAmber
+                    : BitMechanicalTheme.outlineVariant,
                   width: 0.8,
                 ),
               ),
@@ -303,9 +479,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
         const SizedBox(height: 18),
 
-        // Action Button (Next / Get Started)
+        // Action Button (Next / Launch Klick)
         GestureDetector(
-          onTap: _onNext,
+          onTap: isLastPage ? _finishOnboarding : _onNext,
           child: Container(
             width: double.infinity,
             height: 48,
@@ -339,6 +515,11 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     ),
                   ),
                   const SizedBox(width: 8),
+                  Icon(
+                    isLastPage ? Icons.power_settings_new : Icons.arrow_forward,
+                    color: const Color(0xFF111111),
+                    size: 16,
+                  ),
                 ],
               ),
             ),

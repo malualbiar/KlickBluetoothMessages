@@ -65,6 +65,36 @@ class KlickDevice {
     if (rssi >= -80) return 2;
     return 1;
   }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'name': name,
+      'macAddress': macAddress,
+      'rssi': rssi,
+      'isConnected': isConnected,
+      'deviceType': deviceType.index,
+      'lastSeen': lastSeen.toIso8601String(),
+      'unreadCount': unreadCount,
+      'customStatus': customStatus,
+    };
+  }
+
+  factory KlickDevice.fromJson(Map<String, dynamic> json) {
+    return KlickDevice(
+      id: json['id'] as String? ?? '',
+      name: json['name'] as String? ?? 'Nearby Contact',
+      macAddress: json['macAddress'] as String? ?? '',
+      rssi: json['rssi'] as int? ?? -60,
+      isConnected: json['isConnected'] as bool? ?? false,
+      deviceType: DeviceType.values[(json['deviceType'] as int? ?? 0).clamp(0, DeviceType.values.length - 1)],
+      lastSeen: json['lastSeen'] != null
+          ? DateTime.tryParse(json['lastSeen'] as String) ?? DateTime.now()
+          : DateTime.now(),
+      unreadCount: json['unreadCount'] as int? ?? 0,
+      customStatus: json['customStatus'] as String?,
+    );
+  }
 }
 
 class KlickMessage {
@@ -125,22 +155,30 @@ class KlickMessage {
         return '[ACK]';
     }
   }
-}
 
-class KlickChannel {
-  final String id;
-  final String name;
-  final String frequency; // e.g. "CH-37 (2402 MHz)"
-  final String description;
-  final int activeNodes;
-  final int unreadCount;
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'senderId': senderId,
+      'senderName': senderName,
+      'text': text,
+      'timestamp': timestamp.toIso8601String(),
+      'status': status.index,
+      'isMe': isMe,
+    };
+  }
 
-  const KlickChannel({
-    required this.id,
-    required this.name,
-    required this.frequency,
-    required this.description,
-    this.activeNodes = 1,
-    this.unreadCount = 0,
-  });
+  factory KlickMessage.fromJson(Map<String, dynamic> json) {
+    return KlickMessage(
+      id: json['id'] as String? ?? '',
+      senderId: json['senderId'] as String? ?? '',
+      senderName: json['senderName'] as String? ?? '',
+      text: json['text'] as String? ?? '',
+      timestamp: json['timestamp'] != null
+          ? DateTime.tryParse(json['timestamp'] as String) ?? DateTime.now()
+          : DateTime.now(),
+      status: MessageStatus.values[(json['status'] as int? ?? 1).clamp(0, MessageStatus.values.length - 1)],
+      isMe: json['isMe'] as bool? ?? false,
+    );
+  }
 }

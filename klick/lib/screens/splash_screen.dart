@@ -119,7 +119,7 @@ class _SplashScreenState extends State<SplashScreen>
                       width: 140,
                       height: 140,
                       decoration: BoxDecoration(
-                        color: const Color(0xFF181818),
+                        color: BitMechanicalTheme.hardwareBody,
                         borderRadius: BorderRadius.circular(28),
                         border: Border.all(
                           color: BitMechanicalTheme.primaryAmber,
@@ -138,13 +138,13 @@ class _SplashScreenState extends State<SplashScreen>
                           ),
                         ],
                       ),
-                      clipBehavior: Clip.antiAlias,
+                      padding: const EdgeInsets.all(16),
                       child: Image.asset(
                         'assets/icons/KlickIcon.jpg',
-                        fit: BoxFit.cover,
+                        fit: BoxFit.contain,
                         errorBuilder: (context, error, stackTrace) => Image.asset(
                           'lib/assets/icons/KlickIcon.jpg',
-                          fit: BoxFit.cover,
+                          fit: BoxFit.contain,
                           errorBuilder: (context, error, stackTrace) => Container(
                             color: BitMechanicalTheme.primaryAmber,
                             child: Center(
