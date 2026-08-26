@@ -140,10 +140,10 @@ class _SplashScreenState extends State<SplashScreen>
                       ),
                       clipBehavior: Clip.antiAlias,
                       child: Image.asset(
-                        'assets/icons/KlickICON.jpg',
+                        'assets/icons/KlickIcon.jpg',
                         fit: BoxFit.cover,
                         errorBuilder: (context, error, stackTrace) => Image.asset(
-                          'lib/assets/icons/KlickICON.jpg',
+                          'lib/assets/icons/KlickIcon.jpg',
                           fit: BoxFit.cover,
                           errorBuilder: (context, error, stackTrace) => Container(
                             color: BitMechanicalTheme.primaryAmber,

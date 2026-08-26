@@ -104,7 +104,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             ClipRRect(
               borderRadius: BorderRadius.circular(4),
               child: Image.asset(
-                'lib/assets/icons/KlickICON.jpg',
+                'assets/icons/KlickIcon.jpg',
                 width: 22,
                 height: 22,
                 fit: BoxFit.cover,
@@ -339,13 +339,6 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     ),
                   ),
                   const SizedBox(width: 8),
-                  Icon(
-                    isLastPage
-                        ? Icons.check_circle_outline
-                        : Icons.arrow_forward,
-                    color: const Color(0xFF111111),
-                    size: 16,
-                  ),
                 ],
               ),
             ),
