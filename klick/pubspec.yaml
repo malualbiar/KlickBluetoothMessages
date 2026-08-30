@@ -40,6 +40,10 @@ dependencies:
   flutter_svg: ^2.0.17
   shared_preferences: ^2.3.2
   flutter_local_notifications: ^17.2.3
+  file_picker: ^8.1.4
+  path_provider: ^2.1.4
+  open_filex: ^4.5.0
+  path: ^1.9.0
 
 dev_dependencies:
   flutter_test:
@@ -50,6 +54,10 @@ dev_dependencies:
 flutter_launcher_icons:
   android: true
   ios: true
+  windows:
+    generate: true
+    image_path: "assets/icons/KlickIcon.jpg"
+    icon_size: 48
   image_path: "assets/icons/KlickIcon.jpg"
   min_sdk_android: 21
   adaptive_icon_background: "#131313"

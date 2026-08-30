@@ -6,6 +6,7 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
 import android.content.Intent
+import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
 import androidx.core.app.NotificationCompat
@@ -38,7 +39,15 @@ class KlickBackgroundService : Service() {
             }
             else -> {
                 // Start as foreground with persistent notification
-                startForeground(NOTIFICATION_ID, buildNotification())
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    startForeground(
+                        NOTIFICATION_ID,
+                        buildNotification(),
+                        ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE
+                    )
+                } else {
+                    startForeground(NOTIFICATION_ID, buildNotification())
+                }
             }
         }
         // Restart if killed by system — keeps Bluetooth alive
@@ -62,7 +71,7 @@ class KlickBackgroundService : Service() {
 
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle("Klick Radio Active")
-            .setContentText("Keeping your Bluetooth connections alive")
+            .setContentText("Monitoring & detecting nearby devices")
             .setSmallIcon(android.R.drawable.stat_sys_data_bluetooth)
             .setContentIntent(pendingIntent)
             .setOngoing(true)           // Cannot be swiped away by user
@@ -79,7 +88,7 @@ class KlickBackgroundService : Service() {
                 "Klick Radio Service",
                 NotificationManager.IMPORTANCE_LOW   // Low = silent, no heads-up
             ).apply {
-                description = "Keeps Klick Bluetooth connections active in the background"
+                description = "Keeps Klick Bluetooth device discovery active in the background"
                 setShowBadge(false)
             }
             val manager = getSystemService(NotificationManager::class.java)

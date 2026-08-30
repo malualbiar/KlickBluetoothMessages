@@ -35,37 +35,38 @@ class HardwareShell extends StatelessWidget {
             child: _buildDisplayArea(),
           ),
 
-          // Hardware Controls Area (D-Pad + QWERTY) with animated slide-under transition
-          AnimatedSize(
-            duration: const Duration(milliseconds: 260),
-            curve: Curves.easeInOutCubic,
-            child: isKeyboardOpen
-                ? const SizedBox.shrink()
-                : AnimatedSlide(
-                    offset: isKeyboardOpen ? const Offset(0, 1.0) : Offset.zero,
-                    duration: const Duration(milliseconds: 260),
-                    curve: Curves.easeInOutCubic,
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const SizedBox(height: 8),
+          // Hardware Controls Area (D-Pad + QWERTY) - removed by default, enabled when toggled in settings
+          if (controller.showHardwareButtons)
+            AnimatedSize(
+              duration: const Duration(milliseconds: 260),
+              curve: Curves.easeInOutCubic,
+              child: isKeyboardOpen
+                  ? const SizedBox.shrink()
+                  : AnimatedSlide(
+                      offset: isKeyboardOpen ? const Offset(0, 1.0) : Offset.zero,
+                      duration: const Duration(milliseconds: 260),
+                      curve: Curves.easeInOutCubic,
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const SizedBox(height: 8),
 
-                        // Hardware Controls Area (D-Pad)
-                        DpadControl(controller: controller),
+                          // Hardware Controls Area (D-Pad)
+                          DpadControl(controller: controller),
 
-                        const SizedBox(height: 8),
+                          const SizedBox(height: 8),
 
-                        // QWERTY Tactile Keyboard
-                        QwertyKeyboard(controller: controller),
+                          // QWERTY Tactile Keyboard
+                          QwertyKeyboard(controller: controller),
 
-                        const SizedBox(height: 4),
+                          const SizedBox(height: 4),
 
-                        // Microphone Pin Hole
-                        _buildMicrophoneHole(),
-                      ],
+                          // Microphone Pin Hole
+                          _buildMicrophoneHole(),
+                        ],
+                      ),
                     ),
-                  ),
-          ),
+            ),
         ],
       ),
     );

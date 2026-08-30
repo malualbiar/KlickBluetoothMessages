@@ -9,6 +9,7 @@ class StorageService {
   static const String _keyContacts = 'klick_saved_contacts';
   static const String _keyMessages = 'klick_saved_messages';
   static const String _keyPendingQueue = 'klick_pending_queue';
+  static const String _keyShowHardwareButtons = 'klick_show_hardware_buttons';
 
   SharedPreferences? _prefs;
 
@@ -29,6 +30,17 @@ class StorageService {
   Future<void> setOnboardingComplete(bool completed) async {
     _prefs ??= await SharedPreferences.getInstance();
     await _prefs?.setBool(_keyOnboarding, completed);
+  }
+
+  // Hardware Buttons Toggle Setting
+  Future<bool> getShowHardwareButtons() async {
+    _prefs ??= await SharedPreferences.getInstance();
+    return _prefs?.getBool(_keyShowHardwareButtons) ?? false;
+  }
+
+  Future<void> setShowHardwareButtons(bool show) async {
+    _prefs ??= await SharedPreferences.getInstance();
+    await _prefs?.setBool(_keyShowHardwareButtons, show);
   }
 
   // User Name / Callsign

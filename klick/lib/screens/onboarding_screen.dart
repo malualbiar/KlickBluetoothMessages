@@ -16,6 +16,7 @@ class OnboardingScreen extends StatefulWidget {
 class _OnboardingScreenState extends State<OnboardingScreen> {
   final PageController _pageController = PageController();
   final TextEditingController _nameController = TextEditingController();
+  final FocusNode _nameFocusNode = FocusNode();
   int _currentPage = 0;
   String? _nameError;
 
@@ -44,6 +45,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   void dispose() {
     _pageController.dispose();
     _nameController.dispose();
+    _nameFocusNode.dispose();
     super.dispose();
   }
 
@@ -72,6 +74,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           curve: Curves.easeInOut,
         );
       }
+      _nameFocusNode.requestFocus();
       return;
     }
 
@@ -102,6 +105,11 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                   itemCount: totalPages,
                   onPageChanged: (index) {
                     setState(() => _currentPage = index);
+                    if (index == _pages.length) {
+                      Future.delayed(const Duration(milliseconds: 300), () {
+                        if (mounted) _nameFocusNode.requestFocus();
+                      });
+                    }
                   },
                   itemBuilder: (context, index) {
                     if (index < _pages.length) {
@@ -418,6 +426,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                               Expanded(
                                 child: TextField(
                                   controller: _nameController,
+                                  focusNode: _nameFocusNode,
+                                  autofocus: true,
                                   style: BitMechanicalTheme.headlineMono(
                                     color: const Color(0xFFF5F5F5),
                                     fontSize: 15,

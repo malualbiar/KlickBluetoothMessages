@@ -1,3 +1,5 @@
+import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
@@ -11,12 +13,21 @@ class NotificationService {
 
   bool _isInitialized = false;
 
-  // Channel IDs
-  static const String _messageChannelId = 'klick_messages';
-  static const String _klickRequestChannelId = 'klick_requests';
+  // Channel IDs (Versioned to bust Android's cached channel importance)
+  static const String _messageChannelId = 'klick_messages_v3';
+  static const String _klickRequestChannelId = 'klick_requests_v3';
+  static const String _discoveryChannelId = 'klick_discovery_v3';
+
+  // Callback when notification is clicked
+  void Function(String? payload)? onNotificationTapped;
 
   Future<void> init() async {
     if (_isInitialized) return;
+
+    if (kIsWeb || (!Platform.isAndroid && !Platform.isIOS)) {
+      _isInitialized = true;
+      return;
+    }
 
     const androidSettings =
         AndroidInitializationSettings('@mipmap/ic_launcher');
@@ -35,7 +46,8 @@ class NotificationService {
       await _notificationsPlugin.initialize(
         initSettings,
         onDidReceiveNotificationResponse: (response) {
-          debugPrint('Notification tapped: ${response.payload}');
+          debugPrint('[NotificationService] Notification tapped payload: ${response.payload}');
+          onNotificationTapped?.call(response.payload);
         },
       );
 
@@ -43,29 +55,54 @@ class NotificationService {
           _notificationsPlugin.resolvePlatformSpecificImplementation<
               AndroidFlutterLocalNotificationsPlugin>();
 
-      // Channel 1: Incoming messages — high importance, sound, vibrate
+      // Clean up legacy cached channels if any
+      await androidPlugin?.deleteNotificationChannel('klick_messages');
+      await androidPlugin?.deleteNotificationChannel('klick_requests');
+      await androidPlugin?.deleteNotificationChannel('klick_messages_v2');
+      await androidPlugin?.deleteNotificationChannel('klick_requests_v2');
+
+      final vibrationPattern = Int64List.fromList([0, 250, 200, 250]);
+
+      // Channel 1: Incoming messages — Max importance (pops up as heads-up banner)
       await androidPlugin?.createNotificationChannel(
         AndroidNotificationChannel(
           _messageChannelId,
           'Klick Messages',
-          description: 'Notifications for incoming Bluetooth messages',
+          description: 'High-priority heads-up popups for incoming Bluetooth messages',
           importance: Importance.max,
           playSound: true,
           enableVibration: true,
+          vibrationPattern: vibrationPattern,
           enableLights: true,
           ledColor: const Color(0xFFFFB300),
         ),
       );
 
-      // Channel 2: Klick connection requests — max importance, interrupting
+      // Channel 2: Klick connection requests — Max importance, interrupting
       await androidPlugin?.createNotificationChannel(
         AndroidNotificationChannel(
           _klickRequestChannelId,
           'Klick Requests',
-          description: 'Notifications when someone wants to connect with you',
+          description: 'High-priority alerts when someone wants to connect with you',
           importance: Importance.max,
           playSound: true,
           enableVibration: true,
+          vibrationPattern: vibrationPattern,
+          enableLights: true,
+          ledColor: const Color(0xFFFFB300),
+        ),
+      );
+
+      // Channel 3: Nearby Device Discoveries — Max importance (pops up when devices near each other are detected)
+      await androidPlugin?.createNotificationChannel(
+        AndroidNotificationChannel(
+          _discoveryChannelId,
+          'Nearby Devices',
+          description: 'Pop-up alerts when new Klick devices enter radio range',
+          importance: Importance.max,
+          playSound: true,
+          enableVibration: true,
+          vibrationPattern: vibrationPattern,
           enableLights: true,
           ledColor: const Color(0xFFFFB300),
         ),
@@ -75,13 +112,13 @@ class NotificationService {
       await androidPlugin?.requestNotificationsPermission();
 
       _isInitialized = true;
-      debugPrint('NotificationService initialized successfully');
+      debugPrint('[NotificationService] Initialized successfully with Heads-Up channels');
     } catch (e) {
-      debugPrint('NotificationService init error: $e');
+      debugPrint('[NotificationService] init error: $e');
     }
   }
 
-  /// Show notification for incoming message — fires even with screen off
+  /// Show notification for incoming message — pops up as Heads-Up banner over other apps & lockscreen
   Future<void> showMessageNotification({
     required String senderName,
     required String messageBody,
@@ -89,17 +126,24 @@ class NotificationService {
   }) async {
     if (!_isInitialized) await init();
 
+    final vibrationPattern = Int64List.fromList([0, 250, 200, 250]);
+
     final androidDetails = AndroidNotificationDetails(
       _messageChannelId,
       'Klick Messages',
-      channelDescription: 'Notifications for incoming Bluetooth messages',
+      channelDescription: 'High-priority heads-up popups for incoming Bluetooth messages',
       importance: Importance.max,
-      priority: Priority.high,
-      fullScreenIntent: true,       // wakes screen even when off
+      priority: Priority.max,
+      icon: '@mipmap/ic_launcher',
       playSound: true,
       enableVibration: true,
-      ticker: 'New Klick message',
+      vibrationPattern: vibrationPattern,
+      channelShowBadge: true,
+      visibility: NotificationVisibility.public,
+      ticker: 'New Klick message from $senderName',
       showWhen: true,
+      fullScreenIntent: true,
+      category: AndroidNotificationCategory.message,
       styleInformation: BigTextStyleInformation(
         messageBody,
         contentTitle: '📡 Klick from $senderName',
@@ -125,36 +169,100 @@ class NotificationService {
         '📡 Klick from $senderName',
         messageBody,
         details,
-        payload: endpointId,
+        payload: endpointId != null ? 'chat:$endpointId' : null,
       );
+      debugPrint('[NotificationService] Message heads-up notification posted for $senderName');
     } catch (e) {
-      debugPrint('Error showing message notification: $e');
+      debugPrint('[NotificationService] Error showing message notification: $e');
     }
   }
 
-  /// Show notification for incoming Klick connection request — interrupts immediately
+  /// Show notification for incoming Klick connection request — interrupts immediately with banner popup
   Future<void> showKlickRequestNotification({
     required String requesterName,
     String? endpointId,
   }) async {
     if (!_isInitialized) await init();
 
+    final vibrationPattern = Int64List.fromList([0, 300, 200, 300]);
+
     final androidDetails = AndroidNotificationDetails(
       _klickRequestChannelId,
       'Klick Requests',
-      channelDescription: 'Notifications when someone wants to connect with you',
+      channelDescription: 'High-priority alerts when someone wants to connect with you',
       importance: Importance.max,
       priority: Priority.max,
-      fullScreenIntent: true,       // wakes screen even when off
+      icon: '@mipmap/ic_launcher',
       playSound: true,
       enableVibration: true,
-      ticker: 'Incoming Klick request',
+      vibrationPattern: vibrationPattern,
+      channelShowBadge: true,
+      ticker: 'Incoming Klick request from $requesterName',
       showWhen: true,
       autoCancel: true,
+      fullScreenIntent: true,
+      category: AndroidNotificationCategory.call,
       styleInformation: BigTextStyleInformation(
-        '$requesterName wants to Klick! Open the app to Accept or Reject.',
-        contentTitle: '⚡ Incoming Klick!',
+        '$requesterName wants to Klick! Tap to accept or reject.',
+        contentTitle: '⚡ Incoming Klick Request!',
         summaryText: 'Klick Messenger',
+      ),
+    );
+
+    const iosDetails = DarwinNotificationDetails(
+      presentAlert: true,
+      presentBadge: true,
+      presentSound: true,
+      interruptionLevel: InterruptionLevel.critical,
+    );
+
+    final details = NotificationDetails(
+      android: androidDetails,
+      iOS: iosDetails,
+    );
+
+    try {
+      await _notificationsPlugin.show(
+        _stableId('request_${endpointId ?? requesterName}'),
+        '⚡ Incoming Klick Request!',
+        '$requesterName wants to Klick!',
+        details,
+        payload: endpointId != null ? 'request:$endpointId' : null,
+      );
+    } catch (e) {
+      debugPrint('[NotificationService] Error showing Klick request notification: $e');
+    }
+  }
+
+  /// Show notification when a new device is detected nearby — pops up banner
+  Future<void> showDeviceDiscoveredNotification({
+    required String deviceName,
+    required String endpointId,
+  }) async {
+    if (!_isInitialized) await init();
+
+    final vibrationPattern = Int64List.fromList([0, 200, 150, 200]);
+
+    final androidDetails = AndroidNotificationDetails(
+      _discoveryChannelId,
+      'Nearby Devices',
+      channelDescription: 'Pop-up alerts when new Klick devices enter radio range',
+      importance: Importance.max,
+      priority: Priority.max,
+      icon: '@mipmap/ic_launcher',
+      playSound: true,
+      enableVibration: true,
+      vibrationPattern: vibrationPattern,
+      channelShowBadge: true,
+      ticker: 'Nearby Klick device found: $deviceName',
+      showWhen: true,
+      autoCancel: true,
+      fullScreenIntent: true,
+      category: AndroidNotificationCategory.status,
+      styleInformation: BigTextStyleInformation(
+        '$deviceName is nearby! Tap to connect and start chatting offline.',
+        contentTitle: '⚡ Nearby Device Detected',
+        summaryText: 'Klick Radar',
       ),
     );
 
@@ -172,14 +280,15 @@ class NotificationService {
 
     try {
       await _notificationsPlugin.show(
-        _stableId('request_${endpointId ?? requesterName}'),
-        '⚡ Incoming Klick!',
-        '$requesterName wants to Klick!',
+        _stableId('discovery_$endpointId'),
+        '⚡ Nearby Device Detected',
+        '$deviceName is within radio range!',
         details,
-        payload: endpointId,
+        payload: 'discovery:$endpointId',
       );
+      debugPrint('[NotificationService] Discovery notification posted for $deviceName');
     } catch (e) {
-      debugPrint('Error showing Klick request notification: $e');
+      debugPrint('[NotificationService] Error showing discovery notification: $e');
     }
   }
 
@@ -190,7 +299,7 @@ class NotificationService {
         _stableId('request_$endpointId'),
       );
     } catch (e) {
-      debugPrint('Error dismissing notification: $e');
+      debugPrint('[NotificationService] Error dismissing notification: $e');
     }
   }
 

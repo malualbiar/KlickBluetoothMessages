@@ -269,6 +269,12 @@ void main() {
     final mockService = TestBluetoothService();
     final controller = KlickController(bluetoothService: mockService);
 
+    await tester.pumpWidget(
+      KlickApp(controller: controller, showSplash: false),
+    );
+    await tester.pumpAndSettle();
+    await completeOnboarding(tester);
+
     final pairedFriend = KlickDevice(
       id: 'ep_friend_1',
       name: 'MAVERICK',
@@ -279,12 +285,6 @@ void main() {
       lastSeen: DateTime.now(),
     );
     controller.devices.add(pairedFriend);
-
-    await tester.pumpWidget(
-      KlickApp(controller: controller, showSplash: false),
-    );
-    await tester.pumpAndSettle();
-    await completeOnboarding(tester);
 
     bool autoAccepted = false;
     mockService.onConnectionRequest?.call(
@@ -343,5 +343,260 @@ void main() {
 
     controller.dispose();
   });
+
+  testWidgets('Known paired contact reconnects with new ephemeral endpointId and migrates pending queue', (WidgetTester tester) async {
+    final mockService = TestBluetoothService();
+    final controller = KlickController(bluetoothService: mockService);
+
+    // Initial state: contact 'MAVERICK' was previously saved with old endpoint ID 'ep_old_1'
+    final oldFriend = KlickDevice(
+      id: 'ep_old_1',
+      name: 'MAVERICK',
+      macAddress: 'ep_old_1',
+      rssi: -50,
+      isConnected: false,
+      isPaired: true,
+      lastSeen: DateTime.now(),
+    );
+    controller.devices.add(oldFriend);
+
+    // Queue a message under the old endpoint ID
+    controller.sendDirectMessage(oldFriend, 'Queued for Maverick');
+    expect(controller.pendingMessages['ep_old_1']?.length, 1);
+
+    await tester.pumpWidget(
+      KlickApp(controller: controller, showSplash: false),
+    );
+    await tester.pumpAndSettle();
+    await completeOnboarding(tester);
+
+    // Peer re-appears with a NEW ephemeral endpoint ID 'ep_new_2'
+    mockService.onDeviceFound?.call(
+      KlickDevice(
+        id: 'ep_new_2',
+        name: 'MAVERICK',
+        macAddress: 'ep_new_2',
+        rssi: -45,
+        isConnected: false,
+        lastSeen: DateTime.now(),
+      ),
+    );
+    await tester.pump();
+
+    // Verify contact ID was updated to new ephemeral ID
+    final updatedContact = controller.devices.firstWhere((d) => d.name == 'MAVERICK');
+    expect(updatedContact.id, 'ep_new_2');
+
+    // Verify contact is now ONLINE automatically
+    expect(updatedContact.isConnected, isTrue);
+
+    // Verify pending message was migrated, flushed, and transmitted over Bluetooth
+    expect(mockService.sentMessages.any((m) => m.contains('Queued for Maverick')), isTrue);
+    expect(controller.pendingMessages['ep_old_1'], isNull);
+    expect(controller.pendingMessages['ep_new_2']?.isEmpty ?? true, isTrue);
+
+    // Verify message status in conversation history is now sent
+    final msgs = controller.conversationMessages['ep_new_2'] ?? [];
+    expect(msgs.any((m) => m.text == 'Queued for Maverick' && m.status == MessageStatus.sent), isTrue);
+
+    controller.dispose();
+  });
+
+  testWidgets('Hardware buttons (D-Pad and QWERTY) are hidden by default', (WidgetTester tester) async {
+    final mockService = TestBluetoothService();
+    final controller = KlickController(bluetoothService: mockService);
+
+    await tester.pumpWidget(
+      KlickApp(controller: controller, showSplash: false),
+    );
+    await tester.pumpAndSettle();
+    await completeOnboarding(tester);
+
+    // Default: showHardwareButtons is false
+    expect(controller.showHardwareButtons, isFalse);
+    expect(find.text('ENT'), findsNothing);
+    expect(find.byIcon(Icons.arrow_drop_up), findsNothing);
+
+    // Toggle hardware buttons ON
+    await controller.toggleHardwareButtons(true);
+    await tester.pumpAndSettle();
+
+    expect(find.text('ENT'), findsOneWidget);
+    expect(find.byIcon(Icons.arrow_drop_up), findsOneWidget);
+
+    // Toggle hardware buttons OFF again
+    await controller.toggleHardwareButtons(false);
+    await tester.pumpAndSettle();
+
+    expect(find.text('ENT'), findsNothing);
+    expect(find.byIcon(Icons.arrow_drop_up), findsNothing);
+
+    controller.dispose();
+  });
+
+  testWidgets('Physical keyboard typing works seamlessly in Onboarding and Chat', (WidgetTester tester) async {
+    final mockService = TestBluetoothService();
+    final controller = KlickController(bluetoothService: mockService);
+
+    await tester.pumpWidget(
+      KlickApp(controller: controller, showSplash: false),
+    );
+    await tester.pumpAndSettle();
+
+    // Navigate to page 3 (callsign form)
+    for (int i = 0; i < 3; i++) {
+      await tester.tap(find.text('CONTINUE'));
+      await tester.pumpAndSettle();
+    }
+
+    // Verify text field is present and types callsign
+    final textField = find.byType(TextField);
+    expect(textField, findsOneWidget);
+    await tester.enterText(textField, 'CYBERPUNK');
+    await tester.pumpAndSettle();
+    expect(find.text('CYBERPUNK'), findsOneWidget);
+
+    // Submit callsign to complete onboarding
+    await tester.tap(find.text('LAUNCH KLICK'));
+    await tester.pumpAndSettle();
+
+    expect(controller.isOnboardingComplete, isTrue);
+    expect(controller.localDeviceName, 'CYBERPUNK');
+
+    controller.dispose();
+  });
+
+  testWidgets('Local P2P device discovery, connection, and high-speed file transfer rendering test', (WidgetTester tester) async {
+    final mockService = TestBluetoothService();
+    final controller = KlickController(bluetoothService: mockService);
+
+    await tester.pumpWidget(
+      KlickApp(controller: controller, showSplash: false),
+    );
+    await tester.pumpAndSettle();
+    await completeOnboarding(tester);
+
+    // 1. Simulate Local P2P device discovery
+    final pcDevice = KlickDevice(
+      id: 'p2p_192.168.1.100_9649',
+      name: 'DESKTOP-TERMINAL',
+      macAddress: 'node_888999',
+      rssi: -45,
+      isConnected: true,
+      isPaired: true,
+      deviceType: DeviceType.pcTerminal,
+      connectionType: ConnectionType.localP2p,
+      ipAddress: '192.168.1.100',
+      port: 9649,
+      lastSeen: DateTime.now(),
+    );
+    controller.devices.add(pcDevice);
+    controller.openChat(pcDevice);
+    await tester.pumpAndSettle();
+
+    // Verify chat UI renders P2P badge and + FILE button
+    expect(find.text('DESKTOP-TERMINAL'), findsWidgets);
+    expect(find.text('P2P'), findsOneWidget);
+    expect(find.text('+ FILE'), findsOneWidget);
+
+    // 2. Simulate sending a file
+    final fileMsg = KlickMessage(
+      id: 'file_test_1',
+      senderId: 'me',
+      senderName: 'Me',
+      text: 'document.pdf',
+      timestamp: DateTime.now(),
+      status: MessageStatus.sending,
+      isMe: true,
+      messageType: MessageType.file,
+      fileName: 'document.pdf',
+      fileSize: 1048576, // 1.0 MB
+      transferProgress: 0.65,
+    );
+
+    controller.conversationMessages[pcDevice.id] = [fileMsg];
+    controller.notifyListeners();
+    await tester.pump();
+
+    // Verify file bubble with progress and size is rendered
+    expect(find.text('document.pdf'), findsOneWidget);
+    expect(find.text('1.0 MB'), findsOneWidget);
+    expect(find.text('TX: 65%'), findsOneWidget);
+    expect(find.byType(LinearProgressIndicator), findsOneWidget);
+
+    // 3. Simulate file transfer completed
+    final completedFileMsg = fileMsg.copyWith(
+      status: MessageStatus.sent,
+      transferProgress: 1.0,
+    );
+    controller.conversationMessages[pcDevice.id] = [completedFileMsg];
+    controller.notifyListeners();
+    await tester.pump();
+
+    // Verify SENT status upon completion
+    expect(find.text('TX: 65%'), findsNothing);
+    expect(find.text('SAVED'), findsNothing);
+
+    // 4. Simulate inbound received photo from PC
+    final inboundImgMsg = KlickMessage(
+      id: 'file_inbound_2',
+      senderId: pcDevice.id,
+      senderName: 'DESKTOP-TERMINAL',
+      text: 'screenshot.png',
+      timestamp: DateTime.now(),
+      status: MessageStatus.received,
+      isMe: false,
+      messageType: MessageType.image,
+      fileName: 'screenshot.png',
+      fileSize: 2097152, // 2.0 MB
+      transferProgress: 1.0,
+    );
+
+    controller.conversationMessages[pcDevice.id] = [completedFileMsg, inboundImgMsg];
+    controller.notifyListeners();
+    await tester.pump();
+
+    expect(find.text('screenshot.png'), findsOneWidget);
+    expect(find.text('2.0 MB'), findsOneWidget);
+
+    controller.dispose();
+  });
+
+  testWidgets('Background device detection and notification popup test', (WidgetTester tester) async {
+    final mockService = TestBluetoothService();
+    final controller = KlickController(bluetoothService: mockService);
+
+    await tester.pumpWidget(
+      KlickApp(controller: controller, showSplash: false),
+    );
+    await tester.pumpAndSettle();
+    await completeOnboarding(tester);
+
+    // Simulate backgrounding the app
+    controller.handleAppLifecycleState(AppLifecycleState.paused);
+    expect(controller.isAppInBackground, isTrue);
+
+    // Simulate discovering a new nearby device while backgrounded
+    final newNearbyDevice = KlickDevice(
+      id: 'ep_nearby_ghost',
+      name: 'GHOST-RADIO',
+      macAddress: 'ep_nearby_ghost',
+      rssi: -45,
+      lastSeen: DateTime.now(),
+    );
+
+    mockService.onDeviceFound?.call(newNearbyDevice);
+    await tester.pump();
+
+    // Verify the new device was registered in discovered list
+    expect(controller.discoveredDevices.any((d) => d.id == 'ep_nearby_ghost'), isTrue);
+
+    // Simulate returning to foreground
+    controller.handleAppLifecycleState(AppLifecycleState.resumed);
+    expect(controller.isAppInBackground, isFalse);
+
+    controller.dispose();
+  });
 }
+
 

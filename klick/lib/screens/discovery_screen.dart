@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../controllers/klick_controller.dart';
+import '../models/bluetooth_device.dart';
 import '../theme/bit_mechanical_theme.dart';
 
 class DiscoveryScreen extends StatelessWidget {
@@ -124,7 +125,7 @@ class DiscoveryScreen extends StatelessWidget {
                     final isFocused = controller.listFocusIndex == index;
 
                     final isAlreadyFriend = controller.devices.any(
-                        (d) => (d.id == device.id || d.macAddress == device.id) && d.isPaired);
+                        (d) => d.matchesPeer(device.id, device.name) && d.isPaired);
 
                     return GestureDetector(
                       onTap: () {
@@ -148,7 +149,11 @@ class DiscoveryScreen extends StatelessWidget {
                         child: Row(
                           children: [
                             Icon(
-                              isAlreadyFriend ? Icons.star : Icons.bluetooth,
+                              isAlreadyFriend
+                                  ? Icons.star
+                                  : (device.deviceType == DeviceType.pcTerminal
+                                      ? Icons.computer
+                                      : Icons.bluetooth),
                               size: 14,
                               color: isFocused ? bgColor : inkColor,
                             ),
@@ -168,6 +173,31 @@ class DiscoveryScreen extends StatelessWidget {
                                       ),
                                     ),
                                   ),
+                                  if (device.connectionType == ConnectionType.localP2p) ...[
+                                    const SizedBox(width: 4),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 3, vertical: 1),
+                                      decoration: BoxDecoration(
+                                        color: isFocused
+                                            ? bgColor
+                                            : inkColor.withValues(alpha: 0.15),
+                                        borderRadius: BorderRadius.circular(2),
+                                        border: Border.all(
+                                          color: isFocused ? bgColor : inkColor,
+                                          width: 0.8,
+                                        ),
+                                      ),
+                                      child: Text(
+                                        'P2P',
+                                        style: BitMechanicalTheme.statusPixel(
+                                          color: isFocused ? inkColor : inkColor,
+                                          fontSize: 7,
+                                          fontWeight: FontWeight.w900,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
                                   if (isAlreadyFriend) ...[
                                     const SizedBox(width: 4),
                                     Container(

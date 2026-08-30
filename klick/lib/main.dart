@@ -3,7 +3,6 @@ import 'package:flutter/services.dart';
 import 'controllers/klick_controller.dart';
 import 'screens/onboarding_screen.dart';
 import 'screens/splash_screen.dart';
-import 'services/background_service.dart';
 import 'theme/bit_mechanical_theme.dart';
 import 'widgets/hardware_shell.dart';
 
@@ -71,19 +70,7 @@ class _KlickMainScreenState extends State<KlickMainScreen>
   /// Called by Android/iOS when the app lifecycle state changes.
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    switch (state) {
-      case AppLifecycleState.paused:
-      case AppLifecycleState.hidden:
-        // App went to background — start foreground service to keep BT alive
-        BackgroundService.start();
-        break;
-      case AppLifecycleState.resumed:
-        // App back in foreground — stop the foreground service (UI is running now)
-        BackgroundService.stop();
-        break;
-      default:
-        break;
-    }
+    _controller.handleAppLifecycleState(state);
   }
 
   void _onControllerUpdate() {
@@ -95,7 +82,22 @@ class _KlickMainScreenState extends State<KlickMainScreen>
   bool _handlePhysicalKeyEvent(KeyEvent event) {
     if (event is KeyDownEvent) {
       final key = event.logicalKey;
+      final focusNode = FocusManager.instance.primaryFocus;
+      final isTextInputFocused = focusNode != null &&
+          focusNode is! FocusScopeNode &&
+          (focusNode.context?.findAncestorWidgetOfExactType<EditableText>() != null ||
+              focusNode.context?.widget is EditableText);
 
+      // If user is currently focused in a text field, let the text field handle all typing
+      if (isTextInputFocused) {
+        if (key == LogicalKeyboardKey.escape) {
+          focusNode.unfocus();
+          return true;
+        }
+        return false;
+      }
+
+      // Hardware navigation when not typing in a text field
       if (key == LogicalKeyboardKey.arrowUp) {
         _controller.handleKeyPress('UP');
         return true;
@@ -114,18 +116,6 @@ class _KlickMainScreenState extends State<KlickMainScreen>
       } else if (key == LogicalKeyboardKey.escape) {
         _controller.handleKeyPress('ESC');
         return true;
-      } else if (key == LogicalKeyboardKey.backspace) {
-        _controller.handleKeyPress('<-');
-        return true;
-      } else if (key == LogicalKeyboardKey.space) {
-        _controller.handleKeyPress(' ');
-        return true;
-      } else if (event.character != null && event.character!.isNotEmpty) {
-        final char = event.character!;
-        if (RegExp(r'^[a-zA-Z0-9.,!?:;@#\-_/]$').hasMatch(char)) {
-          _controller.handleKeyPress(char.toUpperCase());
-          return true;
-        }
       }
     }
     return false;
@@ -146,24 +136,49 @@ class _KlickMainScreenState extends State<KlickMainScreen>
   @override
   Widget build(BuildContext context) {
     if (!_isSplashLoaded) {
-      return SplashScreen(
-        controller: _controller,
-        onLoaded: () {
-          if (mounted) {
-            setState(() => _isSplashLoaded = true);
-          }
-        },
+      return Scaffold(
+        backgroundColor: BitMechanicalTheme.surfaceContainerLowest,
+        body: SafeArea(
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 440),
+              child: SplashScreen(
+                controller: _controller,
+                onLoaded: () {
+                  if (mounted) {
+                    setState(() => _isSplashLoaded = true);
+                  }
+                },
+              ),
+            ),
+          ),
+        ),
       );
     }
 
     if (!_controller.isOnboardingComplete) {
-      return OnboardingScreen(controller: _controller);
+      return Scaffold(
+        backgroundColor: BitMechanicalTheme.hardwareBody,
+        body: SafeArea(
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 440),
+              child: OnboardingScreen(controller: _controller),
+            ),
+          ),
+        ),
+      );
     }
 
     return Scaffold(
-      backgroundColor: BitMechanicalTheme.hardwareBody,
+      backgroundColor: BitMechanicalTheme.surfaceContainerLowest,
       body: SafeArea(
-        child: HardwareShell(controller: _controller),
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 440),
+            child: HardwareShell(controller: _controller),
+          ),
+        ),
       ),
     );
   }

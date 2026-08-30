@@ -5,6 +5,12 @@ enum DeviceType {
   meshNode,
   beacon,
   smartphone,
+  pcTerminal,
+}
+
+enum ConnectionType {
+  bluetooth,
+  localP2p,
 }
 
 enum MessageStatus {
@@ -13,6 +19,12 @@ enum MessageStatus {
   sent,
   received,
   acknowledged,
+}
+
+enum MessageType {
+  text,
+  file,
+  image,
 }
 
 class KlickDevice {
@@ -28,6 +40,9 @@ class KlickDevice {
   /// True once this contact has ever accepted a Klick connection with us.
   /// Paired contacts skip the accept/reject modal on future encounters.
   final bool isPaired;
+  final ConnectionType connectionType;
+  final String? ipAddress;
+  final int? port;
 
   const KlickDevice({
     required this.id,
@@ -40,6 +55,9 @@ class KlickDevice {
     this.unreadCount = 0,
     this.customStatus,
     this.isPaired = false,
+    this.connectionType = ConnectionType.bluetooth,
+    this.ipAddress,
+    this.port,
   });
 
   KlickDevice copyWith({
@@ -53,6 +71,9 @@ class KlickDevice {
     int? unreadCount,
     String? customStatus,
     bool? isPaired,
+    ConnectionType? connectionType,
+    String? ipAddress,
+    int? port,
   }) {
     return KlickDevice(
       id: id ?? this.id,
@@ -65,6 +86,9 @@ class KlickDevice {
       unreadCount: unreadCount ?? this.unreadCount,
       customStatus: customStatus ?? this.customStatus,
       isPaired: isPaired ?? this.isPaired,
+      connectionType: connectionType ?? this.connectionType,
+      ipAddress: ipAddress ?? this.ipAddress,
+      port: port ?? this.port,
     );
   }
 
@@ -73,6 +97,25 @@ class KlickDevice {
     if (rssi >= -65) return 3;
     if (rssi >= -80) return 2;
     return 1;
+  }
+
+  /// Returns true if this contact matches the peer by endpointId, macAddress, or callsign name.
+  bool matchesPeer(String endpointId, [String? endpointName]) {
+    if (id.isNotEmpty && id == endpointId) return true;
+    if (macAddress.isNotEmpty && macAddress == endpointId) return true;
+    if (endpointName != null && endpointName.trim().isNotEmpty) {
+      final n1 = name.trim().toUpperCase();
+      final n2 = endpointName.trim().toUpperCase();
+      if (n1.isNotEmpty &&
+          n2.isNotEmpty &&
+          n1 != 'NEARBY CONTACT' &&
+          n1 != 'NEARBY DEVICE' &&
+          n1 != 'KLICK-USER' &&
+          n1 == n2) {
+        return true;
+      }
+    }
+    return false;
   }
 
   Map<String, dynamic> toJson() {
@@ -87,6 +130,9 @@ class KlickDevice {
       'unreadCount': unreadCount,
       'customStatus': customStatus,
       'isPaired': isPaired,
+      'connectionType': connectionType.index,
+      'ipAddress': ipAddress,
+      'port': port,
     };
   }
 
@@ -104,6 +150,9 @@ class KlickDevice {
       unreadCount: json['unreadCount'] as int? ?? 0,
       customStatus: json['customStatus'] as String?,
       isPaired: json['isPaired'] as bool? ?? false,
+      connectionType: ConnectionType.values[(json['connectionType'] as int? ?? 0).clamp(0, ConnectionType.values.length - 1)],
+      ipAddress: json['ipAddress'] as String?,
+      port: json['port'] as int?,
     );
   }
 }
@@ -116,6 +165,12 @@ class KlickMessage {
   final DateTime timestamp;
   final MessageStatus status;
   final bool isMe;
+  final MessageType messageType;
+  final String? filePath;
+  final String? fileName;
+  final int? fileSize;
+  final double? transferProgress; // 0.0 to 1.0
+  final String? mimeType;
 
   const KlickMessage({
     required this.id,
@@ -125,6 +180,12 @@ class KlickMessage {
     required this.timestamp,
     required this.status,
     required this.isMe,
+    this.messageType = MessageType.text,
+    this.filePath,
+    this.fileName,
+    this.fileSize,
+    this.transferProgress,
+    this.mimeType,
   });
 
   KlickMessage copyWith({
@@ -135,6 +196,12 @@ class KlickMessage {
     DateTime? timestamp,
     MessageStatus? status,
     bool? isMe,
+    MessageType? messageType,
+    String? filePath,
+    String? fileName,
+    int? fileSize,
+    double? transferProgress,
+    String? mimeType,
   }) {
     return KlickMessage(
       id: id ?? this.id,
@@ -144,7 +211,36 @@ class KlickMessage {
       timestamp: timestamp ?? this.timestamp,
       status: status ?? this.status,
       isMe: isMe ?? this.isMe,
+      messageType: messageType ?? this.messageType,
+      filePath: filePath ?? this.filePath,
+      fileName: fileName ?? this.fileName,
+      fileSize: fileSize ?? this.fileSize,
+      transferProgress: transferProgress ?? this.transferProgress,
+      mimeType: mimeType ?? this.mimeType,
     );
+  }
+
+  bool get isImage {
+    if (messageType == MessageType.image) return true;
+    if (fileName != null) {
+      final ext = fileName!.toLowerCase();
+      return ext.endsWith('.jpg') ||
+          ext.endsWith('.jpeg') ||
+          ext.endsWith('.png') ||
+          ext.endsWith('.gif') ||
+          ext.endsWith('.webp') ||
+          ext.endsWith('.bmp');
+    }
+    return false;
+  }
+
+  String get fileSizeFormatted {
+    if (fileSize == null || fileSize! <= 0) return '';
+    final bytes = fileSize!;
+    if (bytes < 1024) return '$bytes B';
+    if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
+    if (bytes < 1024 * 1024 * 1024) return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+    return '${(bytes / (1024 * 1024 * 1024)).toStringAsFixed(2)} GB';
   }
 
   String get timeFormatted {
@@ -178,6 +274,12 @@ class KlickMessage {
       'timestamp': timestamp.toIso8601String(),
       'status': status.index,
       'isMe': isMe,
+      'messageType': messageType.index,
+      'filePath': filePath,
+      'fileName': fileName,
+      'fileSize': fileSize,
+      'transferProgress': transferProgress,
+      'mimeType': mimeType,
     };
   }
 
@@ -192,6 +294,12 @@ class KlickMessage {
           : DateTime.now(),
       status: MessageStatus.values[(json['status'] as int? ?? 2).clamp(0, MessageStatus.values.length - 1)],
       isMe: json['isMe'] as bool? ?? false,
+      messageType: MessageType.values[(json['messageType'] as int? ?? 0).clamp(0, MessageType.values.length - 1)],
+      filePath: json['filePath'] as String?,
+      fileName: json['fileName'] as String?,
+      fileSize: json['fileSize'] as int?,
+      transferProgress: (json['transferProgress'] as num?)?.toDouble(),
+      mimeType: json['mimeType'] as String?,
     );
   }
 }

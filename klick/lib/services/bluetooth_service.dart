@@ -39,7 +39,7 @@ abstract class BluetoothService {
 }
 
 class NearbyBluetoothService implements BluetoothService {
-  static const Strategy _strategy = Strategy.P2P_STAR;
+  static const Strategy _strategy = Strategy.P2P_CLUSTER;
   static const String _serviceId = 'com.klick.bluetooth.messages';
 
   @override
